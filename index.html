@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asteroid Field</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background-color: #000;
+            border: 2px solid #fff;
+        }
+
+        .star {
+            position: absolute;
+            background-color: white;
+            border-radius: 50%;
+        }
+
+        .asteroid {
+            position: absolute;
+            background-color: #888; /* Grey color for asteroids */
+            border-radius: 50%; /* Makes them roughly circular */
+        }
+
+        .ship {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 25px solid red; /* Triangle shape for the ship */
+            transition: transform 0.1s ease; /* Smooth rotation */
+        }
+        .ship .flame {
+            position: absolute;
+            bottom: -5px; /* Adjust position to come out from the bottom */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 5px;
+            height: 10px; /* Adjust for visibility */
+            background-color: yellow;
+            border-radius: 50% 50% 0 0;
+            animation: flicker 0.2s infinite alternate; /* Simple flicker animation */
+          }
+        
+        
+          @keyframes flicker {
+            0% { opacity: 1; }
+            100% { opacity: 0.5; }
+          }
+
+        .laser {
+            position: absolute;
+            width: 2px;
+            height: 15px;
+            background-color: red;
+        }
+
+        .score-display, .lives-display, .game-over-screen, .recharge-bar{
+            position: absolute;
+            color: white;
+            font-size: 16px;
+        }
+        .score-display {
+            top: 10px;
+            left: 10px;
+        }
+        .lives-display {
+            top: 10px;
+            right: 10px;
+        }
+
+        .recharge-bar {
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 5px;
+            background-color: #444;
+            border: 1px solid white;
+        }
+        .recharge-bar-fill {
+            height: 100%;
+            background-color: green;
+            width: 0%; /* Initial width */
+            transition: width 0.1s linear;
+        }
+
+        .game-over-screen {
+            display: none;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 30px;
+            z-index: 10; /* Ensure it's on top of other elements */
+        }
+
+        .game-over-screen button {
+            margin-top: 10px;
+            padding: 5px 10px;
+            background-color: #333;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        .game-over-screen button:hover {
+            background-color: #555;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div class="score-display">Score: <span id="score">0</span></div>
+        <div class="lives-display">Lives: <span id="lives">3</span></div>
+        <div class="recharge-bar">
+            <div class="recharge-bar-fill" id="recharge-bar-fill"></div>
+        </div>
+        <div class="game-over-screen" id="game-over">
+            <p>Game Over</p>
+            <p>Final Score: <span id="final-score">0</span></p>
+            <button onclick="restartGame()">Restart</button>
+        </div>
+    </div>
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const scoreDisplay = document.getElementById('score');
+        const livesDisplay = document.getElementById('lives');
+        const gameOverScreen = document.getElementById('game-over');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const rechargeBarFill = document.getElementById('recharge-bar-fill');
+
+        const containerWidth = gameContainer.offsetWidth;
+        const containerHeight = gameContainer.offsetHeight;
+
+        let score = 0;
+        let lives = 3;
+        let isGameOver = false;
+        let isHyperspaceActive = false;
+        let hyperspaceCharges = 3; 
+
+        let ship;
+        let shipX = containerWidth / 2;
+        let shipY = containerHeight / 2;
+        let shipSpeedX = 0;
+        let shipSpeedY = 0;
+        const maxShipSpeed = 3;
+        const shipAcceleration = 0.2;
+        const shipDeceleration = 0.1;
+        let shipRotation = 0;
+
+        let lasers = [];
+        const laserSpeed = 10;
+        let canShoot = true;
+        let rechargeTime = 1000; 
+        let rechargeProgress = 0; 
+
+        let asteroids = [];
+        let asteroidSpawnInterval = 2000; 
+        let asteroidMinSize = 20;
+        let asteroidMaxSize = 50;
+
+        let gameLoopInterval;
+        let lastAsteroidSpawnTime = Date.now();
+        let stars = [];
+
+        // Function to initialize stars
+        function initializeStars() {
+            for (let i = 0; i < 100; i++) {
+                createStar();
+            }
+        }
+
+        // Function to create a single star
+        function createStar() {
+            const star = document.createElement('div');
+            star.classList.add('star');
+            gameContainer.appendChild(star);
+            stars.push(star);
+
+            resetStar(star);
+        }
+        
+        function resetStar(star) {
+            const x = Math.random() * containerWidth;
+            const y = Math.random() * containerHeight;
+            const size = Math.random() * 2 + 1; 
+            const speed = Math.random() * 0.5 + 0.1; 
+
+            star.style.left = `${x}px`;
+            star.style.top = `${y}px`;
+            star.style.width = `${size}px`;
+            star.style.height = `${size}px`;
+            star.speed = speed;
+        }
+
+        function updateStars() {
+            stars.forEach(star => {
+                let y = parseFloat(star.style.top);
+                y += star.speed;
+                if (y > containerHeight) {
+                    resetStar(star);
+                    star.style.top = `0px`;
+                } else {
+                    star.style.top = `${y}px`;
+                }
+            });
+        }
+
+        function createAsteroid() {
+            const asteroid = document.createElement('div');
+            asteroid.classList.add('asteroid');
+            gameContainer.appendChild(asteroid);
+            asteroids.push(asteroid);
+        
+            const size = Math.random() * (asteroidMaxSize - asteroidMinSize) + asteroidMinSize;
+            asteroid.style.width = `${size}px`;
+            asteroid.style.height = `${size}px`;
+        
+            // Randomize starting position (top, bottom, left, right edges)
+            const edge = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
+            let x, y;
+            switch (edge) {
+                case 0: // Top
+                    x = Math.random() * containerWidth;
+                    y = -size;
+                    break;
+                case 1: // Right
+                    x = containerWidth + size;
+                    y = Math.random() * containerHeight;
+                    break;
+                case 2: // Bottom
+                    x = Math.random() * containerWidth;
+                    y = containerHeight + size;
+                    break;
+                case 3: // Left
+                    x = -size;
+                    y = Math.random() * containerHeight;
+                    break;
+            }
+        
+            asteroid.style.left = `${x}px`;
+            asteroid.style.top = `${y}px`;
+            asteroid.speedX = (Math.random() - 0.5) * 4; // Random horizontal speed
+            asteroid.speedY = (Math.random() - 0.5) * 4; // Random vertical speed
+            asteroid.rotationSpeed = (Math.random() - 0.5) * 2; // Random rotation speed
+            asteroid.rotation = 0;
+            asteroid.size = size; 
+        }
+
+        function updateAsteroids() {
+            asteroids.forEach((asteroid, index) => {
+                // Update position
+                let x = parseFloat(asteroid.style.left);
+                let y = parseFloat(asteroid.style.top);
+                x += asteroid.speedX;
+                y += asteroid.speedY;
+                asteroid.style.left = `${x}px`;
+                asteroid.style.top = `${y}px`;
+        
+                // Update rotation
+                asteroid.rotation += asteroid.rotationSpeed;
+                asteroid.style.transform = `rotate(${asteroid.rotation}deg)`;
+        
+                // Check for out of bounds
+                if (x + asteroid.offsetWidth < 0 || x > containerWidth || y + asteroid.offsetHeight < 0 || y > containerHeight) {
+                    asteroids.splice(index, 1);
+                    gameContainer.removeChild(asteroid);
+                }
+            });
+        }
+
+        function createShip() {
+            ship = document.createElement('div');
+            ship.classList.add('ship');
+            const flame = document.createElement('div');
+            flame.classList.add('flame');
+            ship.appendChild(flame);
+            gameContainer.appendChild(ship);
+            ship.style.left = `${shipX}px`;
+            ship.style.top = `${shipY}px`;
+        }
+
+        function moveShip() {
+            // Update speed based on pressed keys (with acceleration)
+            if (keysPressed['ArrowUp']) {
+                shipSpeedY = Math.max(shipSpeedY - shipAcceleration, -maxShipSpeed); // Accelerate up
+            } else if (keysPressed['ArrowDown']) {
+                shipSpeedY = Math.min(shipSpeedY + shipAcceleration, maxShipSpeed); // Accelerate down
+            } else {
+                shipSpeedY *= (1 - shipDeceleration); // Decelerate vertically when no key is pressed
+            }
+
+            if (keysPressed['ArrowLeft']) {
+                shipSpeedX = Math.max(shipSpeedX - shipAcceleration, -maxShipSpeed); // Accelerate left
+            } else if (keysPressed['ArrowRight']) {
+                shipSpeedX = Math.min(shipSpeedX + shipAcceleration, maxShipSpeed); // Accelerate right
+            } else {
+                shipSpeedX *= (1 - shipDeceleration); // Decelerate horizontally when no key is pressed
+            }
+
+            // Update ship position based on speed
+            shipX += shipSpeedX;
+            shipY += shipSpeedY;
+
+            // Keep ship within bounds
+            shipX = Math.max(0, Math.min(shipX, containerWidth - ship.offsetWidth));
+            shipY = Math.max(0, Math.min(shipY, containerHeight - ship.offsetHeight));
+
+            // Update ship's position
+            ship.style.left = `${shipX}px`;
+            ship.style.top = `${shipY}px`;
+        }
+
+        function createLaser() {
+            if (!canShoot) return; 
+            const laser = document.createElement('div');
+            laser.classList.add('laser');
+            gameContainer.appendChild(laser);
+        
+            // Calculate laser starting position based on ship's position and size
+            const shipCenterX = shipX + ship.offsetWidth / 2;
+            const shipTopY = shipY;
+        
+            laser.style.left = `${shipCenterX - laser.offsetWidth / 2}px`;
+            laser.style.top = `${shipTopY}px`; 
+            laser.speed = laserSpeed;
+        
+            lasers.push(laser);
+            canShoot = false;
+            rechargeProgress = 0;
+        }
+
+        function updateLasers() {
+            lasers.forEach((laser, index) => {
+                let y = parseFloat(laser.style.top);
+                y -= laser.speed;
+                laser.style.top = `${y}px`;
+
+                // Remove lasers that go off-screen
+                if (y + laser.offsetHeight < 0) {
+                    lasers.splice(index, 1);
+                    gameContainer.removeChild(laser);
+                }
+            });
+        }
+
+        function updateRechargeBar() {
+            if (!canShoot) {
+                rechargeProgress += (1000 / rechargeTime); 
+                const fillWidth = Math.min(100, rechargeProgress);
+                rechargeBarFill.style.width = `${fillWidth}%`;
+
+                if (rechargeProgress >= 100) {
+                    canShoot = true;
+                    rechargeProgress = 0;
+                }
+            } else {
+                rechargeBarFill.style.width = '0%'; // Reset when not recharging
+            }
+        }
+
+        function checkCollisions() {
+            // Check for collision between ship and asteroids
+            asteroids.forEach((asteroid, asteroidIndex) => {
+                if (isColliding(ship, asteroid)) {
+                    // Handle ship-asteroid collision
+                    if (!isGameOver) {
+                        lives--;
+                        livesDisplay.textContent = lives;
+                    }
+        
+                    // Remove the asteroid and create fragments
+                    asteroids.splice(asteroidIndex, 1);
+                    gameContainer.removeChild(asteroid);
+                    createAsteroidFragments(asteroid);
+        
+                    if (lives === 0) {
+                        endGame();
+                    } else {
+                        // Reset ship position to center
+                        resetShipPosition();
+                    }
+                }
+        
+                // Check for collision between lasers and asteroids
+                lasers.forEach((laser, laserIndex) => {
+                    if (isColliding(laser, asteroid)) {
+                        // Handle laser-asteroid collision
+                        score += Math.round(asteroid.size); 
+                        scoreDisplay.textContent = score;
+        
+                        // Remove the asteroid and create fragments
+                        asteroids.splice(asteroidIndex, 1);
+                        gameContainer.removeChild(asteroid);
+                        createAsteroidFragments(asteroid);
+        
+                        // Remove the laser
+                        lasers.splice(laserIndex, 1);
+                        gameContainer.removeChild(laser);
+                    }
+                });
+            });
+        }
+        
+        function isColliding(element1, element2) {
+            const rect1 = element1.getBoundingClientRect();
+            const rect2 = element2.getBoundingClientRect();
+        
+            // Adjust for radius (assuming circular asteroids)
+            const radius1 = rect1.width / 2;
+            const radius2 = rect2.width / 2;
+        
+            // Center coordinates of each element
+            const center1X = rect1.left + radius1;
+            const center1Y = rect1.top + radius1;
+            const center2X = rect2.left + radius2;
+            const center2Y = rect2.top + radius2;
+        
+            // Distance between centers
+            const distanceX = center1X - center2X;
+            const distanceY = center1Y - center2Y;
+            const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+        
+            // Check if the distance is less than the sum of radii
+            return distance < (radius1 + radius2);
+        }
+        
+        
+        function createAsteroidFragments(asteroid) {
+            const numFragments = Math.floor(Math.random() * 3) + 2; // 2 to 4 fragments
+            const originalSize = asteroid.size;
+            const fragmentSize = originalSize / numFragments;
+        
+            for (let i = 0; i < numFragments; i++) {
+                const fragment = document.createElement('div');
+                fragment.classList.add('asteroid');
+                gameContainer.appendChild(fragment);
+        
+                fragment.style.width = `${fragmentSize}px`;
+                fragment.style.height = `${fragmentSize}px`;
+                fragment.style.left = asteroid.style.left;
+                fragment.style.top = asteroid.style.top;
+        
+                // Assign random speeds to fragments, different from the original asteroid
+                fragment.speedX = (Math.random() - 0.5) * 6; // Slightly faster than original asteroids
+                fragment.speedY = (Math.random() - 0.5) * 6;
+                fragment.rotationSpeed = (Math.random() - 0.5) * 3;
+                fragment.rotation = 0;
+                fragment.size = fragmentSize;
+        
+                asteroids.push(fragment);
+            }
+        }
+
+        function resetShipPosition() {
+            shipX = containerWidth / 2 - ship.offsetWidth / 2;
+            shipY = containerHeight / 2 - ship.offsetHeight / 2;
+            ship.style.left = `${shipX}px`;
+            ship.style.top = `${shipY}px`;
+            shipSpeedX = 0;
+            shipSpeedY = 0;
+        }
+
+        function endGame() {
+            isGameOver = true;
+            clearInterval(gameLoopInterval);
+            finalScoreDisplay.textContent = score;
+            gameOverScreen.style.display = 'block';
+        }
+        function restartGame() {
+            isGameOver = false;
+            score = 0;
+            lives = 3;
+            scoreDisplay.textContent = score;
+            livesDisplay.textContent = lives;
+            gameOverScreen.style.display = 'none';
+            asteroids.forEach(asteroid => gameContainer.removeChild(asteroid));
+            asteroids = [];
+            lasers.forEach(laser => gameContainer.removeChild(laser));
+            lasers = [];
+            resetShipPosition();
+            lastAsteroidSpawnTime = Date.now();
+            asteroidSpawnInterval = 2000; // Reset interval
+            startGameLoop();
+        }
+
+        let keysPressed = {};
+
+        window.addEventListener('keydown', (event) => {
+            keysPressed[event.key] = true;
+            if (event.key === ' ' && canShoot) {
+                createLaser();
+            } else if (event.key === 'h' && hyperspaceCharges > 0) { 
+                activateHyperspace();
+            }
+        });
+
+        window.addEventListener('keyup', (event) => {
+            keysPressed[event.key] = false;
+        });
+
+        function activateHyperspace() {
+            hyperspaceCharges--;
+            isHyperspaceActive = true;
+        
+            // Small chance of malfunction
+            if (Math.random() < 0.1) { // 10% chance of malfunction
+                // Place ship in a random asteroid's path
+                const randomAsteroid = asteroids[Math.floor(Math.random() * asteroids.length)];
+                if (randomAsteroid) {
+                    shipX = parseFloat(randomAsteroid.style.left) - ship.offsetWidth / 2;
+                    shipY = parseFloat(randomAsteroid.style.top) - randomAsteroid.offsetHeight / 2;
+                }
+            } else {
+                // Normal hyperspace jump
+                shipX = Math.random() * (containerWidth - ship.offsetWidth);
+                shipY = Math.random() * (containerHeight - ship.offsetHeight);
+            }
+        
+            ship.style.left = `${shipX}px`;
+            ship.style.top = `${shipY}px`;
+        
+            setTimeout(() => {
+                isHyperspaceActive = false;
+            }, 500); 
+        }
+
+        function gameLoop() {
+            if (isGameOver) return;
+
+            moveShip();
+            updateLasers();
+            updateAsteroids();
+            checkCollisions();
+            updateRechargeBar();
+            updateStars();
+
+            const currentTime = Date.now();
+            if (currentTime - lastAsteroidSpawnTime > asteroidSpawnInterval) {
+                createAsteroid();
+                lastAsteroidSpawnTime = currentTime;
+
+                // Increase difficulty over time
+                asteroidSpawnInterval = Math.max(500, asteroidSpawnInterval * 0.99); // Reduce interval, but not below 500ms
+            }
+        }
+        
+        function startGameLoop() {
+            clearInterval(gameLoopInterval);
+            gameLoopInterval = setInterval(gameLoop, 20); // Run the loop every 20ms
+        }
+        
+        // Initialize stars and ship
+        initializeStars();
+        createShip();
+        
+        // Start the game loop
+        startGameLoop();
+
+    </script>
+</body>
+</html>
