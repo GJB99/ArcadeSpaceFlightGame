@@ -483,6 +483,7 @@
             }
         };
 
+        // Permanent stats store total accumulated score and upgrade levels.
         let permanentStats = {
             totalScore: 0,
             upgradeLevels: {
@@ -494,7 +495,7 @@
             }
         };
 
-        // Load permanent stats from localStorage
+        // Load permanent stats from localStorage (no longer loading per-game variables)
         const savedStats = localStorage.getItem('permanentStats');
         if (savedStats) {
             permanentStats = JSON.parse(savedStats);
@@ -819,25 +820,33 @@
 
         function endGame() {
             isGameOver = true;
+            // Add the current score to totalScore in permanentStats
             permanentStats.totalScore += score;
             localStorage.setItem('permanentStats', JSON.stringify(permanentStats));
-            saveGameState();
+            saveGameState();  
             showUpgradeScreen();
         }
+
         function restartGame() {
-            isGameOver = false;
+            // Hide game over screen
+            gameOverScreen.style.display = 'none';
+            // Reset per-run variables
             score = 0;
             lives = 3;
-            scoreDisplay.textContent = score;
-            livesDisplay.textContent = lives;
-            gameOverScreen.style.display = 'none';
-            asteroids.forEach(asteroid => gameContainer.removeChild(asteroid));
+            scoreDisplay.textContent = score.toString();
+            livesDisplay.textContent = lives.toString();
+            isGameOver = false;
+
+            // Clear asteroids, lasers, powerUps if needed
+            asteroids.forEach(a => gameContainer.removeChild(a));
             asteroids = [];
-            lasers.forEach(laser => gameContainer.removeChild(laser));
+            lasers.forEach(l => gameContainer.removeChild(l));
             lasers = [];
+            powerUps.forEach(p => gameContainer.removeChild(p));
+            powerUps = [];
+
+            // Reset ship position and other gameplay variables
             resetShipPosition();
-            lastAsteroidSpawnTime = Date.now();
-            asteroidSpawnInterval = 2000; // Reset interval
             startGameLoop();
         }
 
@@ -1404,6 +1413,7 @@
                     <p>Total Score: ${permanentStats.totalScore}</p>
                     <div class="upgrade-list"></div>
                     <button class="restart-button">Start New Game</button>
+                    <button class="clear-save-button">Clear Save & Start Fresh</button>
                 </div>
             `;
 
@@ -1413,41 +1423,47 @@
                 const currentLevel = permanentStats.upgradeLevels[type];
                 if (currentLevel < 5) {
                     const upgrade = data.levels[currentLevel];
-                    const button = document.createElement('div');
-                    button.classList.add('upgrade-item');
-                    button.innerHTML = `
+                    const item = document.createElement('div');
+                    item.classList.add('upgrade-item');
+                    item.innerHTML = `
                         <span>${data.name} (Level ${currentLevel}/5)</span>
                         <button class="upgrade-button" ${permanentStats.totalScore >= upgrade.cost ? '' : 'disabled'}>
                             Upgrade (${upgrade.cost} points)
                         </button>
                     `;
-
-                    // Add new button before the restart button
-                    const clearSaveButton = document.createElement('button');
-                    clearSaveButton.classList.add('clear-save-button');
-                    clearSaveButton.textContent = 'Clear Save & Start New Game';
-                    clearSaveButton.addEventListener('click', () => {
-                        localStorage.clear();
-                        document.body.removeChild(upgradeScreen);
-                        resetGame();
-                    });
-                    
-                    upgradeScreen.querySelector('.upgrade-container').appendChild(clearSaveButton);
-                    
-                    button.querySelector('.upgrade-button').addEventListener('click', () => {
+                    const button = item.querySelector('.upgrade-button');
+                    button.addEventListener('click', () => {
                         if (permanentStats.totalScore >= upgrade.cost) {
                             permanentStats.totalScore -= upgrade.cost;
                             permanentStats.upgradeLevels[type]++;
                             localStorage.setItem('permanentStats', JSON.stringify(permanentStats));
-                            showUpgradeScreen(); // Refresh screen
+                            document.body.removeChild(upgradeScreen);
+                            showUpgradeScreen();
                         }
                     });
-                    
-                    upgradeList.appendChild(button);
+                    upgradeList.appendChild(item);
                 }
             });
 
-            upgradeScreen.querySelector('.restart-button').addEventListener('click', () => {
+            const restartButton = upgradeScreen.querySelector('.restart-button');
+            restartButton.addEventListener('click', () => {
+                document.body.removeChild(upgradeScreen);
+                resetGame();
+            });
+
+            const clearSaveButton = upgradeScreen.querySelector('.clear-save-button');
+            clearSaveButton.addEventListener('click', () => {
+                localStorage.clear();
+                permanentStats = {
+                    totalScore: 0,
+                    upgradeLevels: {
+                        LASER_SPEED: 0,
+                        LASER_WIDTH: 0,
+                        POWERUP_DURATION: 0,
+                        SHIP_SPEED: 0,
+                        EXTRA_LIVES: 0
+                    }
+                };
                 document.body.removeChild(upgradeScreen);
                 resetGame();
             });
@@ -1455,62 +1471,25 @@
             document.body.appendChild(upgradeScreen);
         }
 
+        // Only save permanentStats now, no per-run variables
         function saveGameState() {
-            const gameState = {
-                permanentStats,
-                score,
-                lives,
-                level,
-                asteroidSpeed,
-                asteroidSpawnRate,
-                shipX,
-                shipY,
-                weaponType,
-                activeEffects,
-                hyperspaceCharges
-            };
+            const gameState = { permanentStats };
             localStorage.setItem('gameState', JSON.stringify(gameState));
         }
 
+        // Load only permanentStats from saved state
         function loadGameState() {
             const savedState = localStorage.getItem('gameState');
             if (savedState) {
                 const gameState = JSON.parse(savedState);
-                
-                // Restore permanent stats
                 permanentStats = gameState.permanentStats;
-                
-                // Restore game variables
-                score = gameState.score;
-                lives = gameState.lives;
-                level = gameState.level;
-                asteroidSpeed = gameState.asteroidSpeed;
-                asteroidSpawnRate = gameState.asteroidSpawnRate;
-                shipX = gameState.shipX;
-                shipY = gameState.shipY;
-                weaponType = gameState.weaponType;
-                activeEffects = gameState.activeEffects;
-                hyperspaceCharges = gameState.hyperspaceCharges;
-                
-                // Update displays
-                scoreDisplay.textContent = score;
-                livesDisplay.textContent = lives;
-                
                 return true;
             }
             return false;
         }
 
         function resetGame() {
-            // Apply upgrades
-            const speedMultiplier = permanentStats.upgradeLevels.SHIP_SPEED > 0 
-                ? upgradeTypes.SHIP_SPEED.levels[permanentStats.upgradeLevels.SHIP_SPEED - 1].multiplier 
-                : 1;
-            const laserSpeedMultiplier = permanentStats.upgradeLevels.LASER_SPEED > 0
-                ? upgradeTypes.LASER_SPEED.levels[permanentStats.upgradeLevels.LASER_SPEED - 1].multiplier
-                : 1;
-            
-            // Reset game state with upgrades
+            // Reset per-run variables
             score = 0;
             lives = 3 + (permanentStats.upgradeLevels.EXTRA_LIVES > 0 
                 ? upgradeTypes.EXTRA_LIVES.levels[permanentStats.upgradeLevels.EXTRA_LIVES - 1].lives 
@@ -1520,33 +1499,23 @@
             shipY = containerHeight - 50;
             shipSpeedX = 0;
             shipSpeedY = 0;
-            
-            // Apply upgrade multipliers
-            maxShipSpeed = 3 * speedMultiplier;
-            laserSpeed = 5 * laserSpeedMultiplier;
-            
-            // Clear arrays
-            asteroids = [];
-            lasers = [];
-            powerUps = [];
-            
-            // Update displays
             scoreDisplay.textContent = '0';
             livesDisplay.textContent = lives.toString();
-            
-            // Hide game over screen
-            gameOverScreen.style.display = 'none';
-            
-            window.addEventListener('load', () => {
-                if (!loadGameState()) {
-                    // No saved state, start new game
-                    initializeStars();
-                    createShip();
-                }
-            // Restart game loops
+
+            // Clear enemies, lasers, etc.
+            asteroids.forEach(a => gameContainer.removeChild(a));
+            asteroids = [];
+            lasers.forEach(l => gameContainer.removeChild(l));
+            lasers = [];
+            powerUps.forEach(p => gameContainer.removeChild(p));
+            powerUps = [];
+
+            resetShipPosition();
             startGameLoop();
-        });
-    }
+        }
+
+        initializeStars();
+        startGameLoop();
     </script>
 </body>
 </html>
