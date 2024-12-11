@@ -310,7 +310,6 @@
             cursor: pointer;
             width: 100%;
         }
-
     </style>
 </head>
 <body>
@@ -330,1038 +329,1139 @@
         </div>
         <div class="multiplier-display">Multiplier: <span id="multiplier">1x</span></div>
     </div>
+
     <script>
-        const gameContainer = document.getElementById('game-container');
-        const scoreDisplay = document.getElementById('score');
-        const livesDisplay = document.getElementById('lives');
-        const gameOverScreen = document.getElementById('game-over');
-        const finalScoreDisplay = document.getElementById('final-score');
-        const rechargeBarFill = document.getElementById('recharge-bar-fill');
+        document.addEventListener('DOMContentLoaded', () => {
+            const gameContainer = document.getElementById('game-container');
+            const scoreDisplay = document.getElementById('score');
+            const livesDisplay = document.getElementById('lives');
+            const gameOverScreen = document.getElementById('game-over');
+            const finalScoreDisplay = document.getElementById('final-score');
+            const rechargeBarFill = document.getElementById('recharge-bar-fill');
+            const cooldownText = document.getElementById('cooldown-text');
 
-        const containerWidth = gameContainer.offsetWidth;
-        const containerHeight = gameContainer.offsetHeight;
+            const containerWidth = gameContainer.offsetWidth;
+            const containerHeight = gameContainer.offsetHeight;
 
-        let score = 0;
-        let lives = 3;
-        let isGameOver = false;
-        let isHyperspaceActive = false;
-        let hyperspaceCharges = 3; 
+            let score = 0;
+            let lives = 3;
+            let isGameOver = false;
+            let isHyperspaceActive = false;
+            let hyperspaceCharges = 3; 
 
-        let ship;
-        let shipX = containerWidth / 2;
-        let shipY = containerHeight / 2;
-        let shipSpeedX = 0;
-        let shipSpeedY = 0;
-        const maxShipSpeed = 3;
-        const shipAcceleration = 0.2;
-        const shipDeceleration = 0.1;
-        let shipRotation = 0;
+            let ship;
+            let shipX = containerWidth / 2;
+            let shipY = containerHeight / 2;
+            let shipSpeedX = 0;
+            let shipSpeedY = 0;
+            const maxShipSpeed = 4;
+            const shipAcceleration = 0.3;
+            const shipDeceleration = 0.1;
+            let shipRotation = 0;
 
-        let lasers = [];
-        const laserSpeed = 5;
-        let canShoot = true;
-        let rechargeTime = 1000; 
-        let rechargeProgress = 0; 
+            let lasers = [];
+            const laserSpeed = 5;
+            let canShoot = true;
+            let rechargeTime = 1000; 
+            let rechargeProgress = 0; 
 
-        let asteroids = [];
-        let asteroidSpawnInterval = 2000; 
-        let asteroidMinSize = 20;
-        let asteroidMaxSize = 50;
+            let asteroids = [];
+            let asteroidSpawnInterval = 2000; 
+            let asteroidMinSize = 20;
+            let asteroidMaxSize = 50;
 
-        let gameLoopInterval;
-        let lastAsteroidSpawnTime = Date.now();
-        let stars = [];
+            let gameLoopInterval;
+            let lastAsteroidSpawnTime = Date.now();
+            let stars = [];
 
-        let powerUps = [];
-        const powerUpTypes = {
-            UNLIMITED_FIRE: 'unlimited-fire',
-            SHIELD: 'shield',
-            TRIPLE_SHOT: 'triple-shot'
-        };
+            let powerUps = [];
+            const powerUpTypes = {
+                UNLIMITED_FIRE: 'unlimited-fire',
+                SHIELD: 'shield',
+                TRIPLE_SHOT: 'triple-shot'
+            };
 
-        let hasShield = false;
-        let shieldElement = null;
+            let hasShield = false;
+            let shieldElement = null;
 
-        let scoreMultiplier = 1;
-        let multiplierTimer = null;
+            let scoreMultiplier = 1;
+            let multiplierTimer = null;
 
-        let level = 1;
-        let asteroidSpeed = 1;
-        let asteroidSpawnRate = 1;
+            let level = 1;
+            let asteroidSpeed = 1;
+            let asteroidSpawnRate = 1;
 
-        let weaponType = 'normal';
-        const weapons = {
-            normal: { cooldown: 1000, damage: 1 },
-            spread: { cooldown: 1500, damage: 0.8 },
-            laser: { cooldown: 2000, damage: 2 }
-        };
+            let weaponType = 'normal';
+            const weapons = {
+                normal: { cooldown: 1000, damage: 1 },
+                spread: { cooldown: 1500, damage: 0.8 },
+                laser: { cooldown: 2000, damage: 2 }
+            };
 
-        let combo = 0;
-        let lastKillTime = 0;
-        const comboTimeout = 2000; // 2 seconds to maintain combo
+            let combo = 0;
+            let lastKillTime = 0;
+            const comboTimeout = 2000; // 2 seconds to maintain combo
 
-        let activeEffects = {
-            shield: false,
-            unlimitedFire: false,
-            tripleShot: false,
-            unlimitedFireTimer: null,
-            shieldTimer: null,
-            tripleShotTimer: null
-        };
+            let activeEffects = {
+                shield: false,
+                unlimitedFire: false,
+                tripleShot: false,
+                unlimitedFireTimer: null,
+                shieldTimer: null,
+                tripleShotTimer: null
+            };
 
-        // Add at the top with other game settings
-        const activeStatusDivs = [];
-        let statusOffsetBottom = 60; // Starting position above recharge bar
+            // Add at the top with other game settings
+            const activeStatusDivs = [];
+            let statusOffsetBottom = 60; // Starting position above recharge bar
 
-        // Add these variables with the other game settings
-        let heatLevel = 0;
-        const maxHeatLevel = 100;
-        const heatPerShot = 15;
-        const coolingRate = 0.5;
-        const overheatCooldownTime = 5000;
-        let isOverheated = false;
+            // Add these variables with the other game settings
+            let heatLevel = 0;
+            const maxHeatLevel = 100;
+            const heatPerShot = 15;
+            const coolingRate = 0.5;
+            const overheatCooldownTime = 5000;
+            let isOverheated = false;
 
-        // Add at the top with other variables
-        const cooldownText = document.getElementById('cooldown-text');
+            // Add these variables at the top
+            let cooldownInterval = null;
 
-        // Add these variables at the top
-        let cooldownInterval = null;
+            let lastShotTime = 0;
+            const shotDelay = 250; // Minimum time between shots in milliseconds
 
-        let lastShotTime = 0;
-        const shotDelay = 250; // Minimum time between shots in milliseconds
-
-        const upgradeTypes = {
-            LASER_SPEED: {
-                name: 'Laser Speed',
-                levels: [
-                    { cost: 500, multiplier: 1.2 },
-                    { cost: 1000, multiplier: 1.4 },
-                    { cost: 2000, multiplier: 1.6 },
-                    { cost: 5000, multiplier: 1.8 },
-                    { cost: 10000, multiplier: 2.0 }
-                ]
-            },
-            LASER_WIDTH: {
-                name: 'Laser Width',
-                levels: [
-                    { cost: 500, multiplier: 1.2 },
-                    { cost: 1000, multiplier: 1.4 },
-                    { cost: 2000, multiplier: 1.6 },
-                    { cost: 5000, multiplier: 1.8 },
-                    { cost: 10000, multiplier: 2.0 }
-                ]
-            },
-            POWERUP_DURATION: {
-                name: 'Power-up Duration',
-                levels: [
-                    { cost: 500, multiplier: 1.2 },
-                    { cost: 1000, multiplier: 1.4 },
-                    { cost: 2000, multiplier: 1.6 },
-                    { cost: 5000, multiplier: 1.8 },
-                    { cost: 10000, multiplier: 2.0 }
-                ]
-            },
-            SHIP_SPEED: {
-                name: 'Ship Speed',
-                levels: [
-                    { cost: 500, multiplier: 1.2 },
-                    { cost: 1000, multiplier: 1.4 },
-                    { cost: 2000, multiplier: 1.6 },
-                    { cost: 5000, multiplier: 1.8 },
-                    { cost: 10000, multiplier: 2.0 }
-                ]
-            },
-            EXTRA_LIVES: {
-                name: 'Extra Lives',
-                levels: [
-                    { cost: 500, lives: 1 },
-                    { cost: 1000, lives: 2 },
-                    { cost: 2000, lives: 3 },
-                    { cost: 5000, lives: 4 },
-                    { cost: 10000, lives: 5 }
-                ]
-            }
-        };
-
-        // Permanent stats store total accumulated score and upgrade levels.
-        let permanentStats = {
-            totalScore: 0,
-            upgradeLevels: {
-                LASER_SPEED: 0,
-                LASER_WIDTH: 0,
-                POWERUP_DURATION: 0,
-                SHIP_SPEED: 0,
-                EXTRA_LIVES: 0
-            }
-        };
-
-        // Load permanent stats from localStorage (no longer loading per-game variables)
-        const savedStats = localStorage.getItem('permanentStats');
-        if (savedStats) {
-            permanentStats = JSON.parse(savedStats);
-        }
-
-        // Function to initialize stars
-        function initializeStars() {
-            for (let i = 0; i < 100; i++) {
-                createStar();
-            }
-        }
-
-        // Function to create a single star
-        function createStar() {
-            const star = document.createElement('div');
-            star.classList.add('star');
-            gameContainer.appendChild(star);
-            stars.push(star);
-
-            resetStar(star);
-        }
-        
-        function resetStar(star) {
-            const x = Math.random() * containerWidth;
-            const y = Math.random() * containerHeight;
-            const size = Math.random() * 2 + 1; 
-            const speed = Math.random() * 0.5 + 0.1; 
-
-            star.style.left = `${x}px`;
-            star.style.top = `${y}px`;
-            star.style.width = `${size}px`;
-            star.style.height = `${size}px`;
-            star.speed = speed;
-        }
-
-        function updateStars() {
-            stars.forEach(star => {
-                let y = parseFloat(star.style.top);
-                y += star.speed;
-                if (y > containerHeight) {
-                    resetStar(star);
-                    star.style.top = `0px`;
-                } else {
-                    star.style.top = `${y}px`;
+            const upgradeTypes = {
+                LASER_SPEED: {
+                    name: 'Laser Speed',
+                    levels: [
+                        { cost: 500, multiplier: 1.2 },
+                        { cost: 1000, multiplier: 1.4 },
+                        { cost: 2000, multiplier: 1.6 },
+                        { cost: 5000, multiplier: 1.8 },
+                        { cost: 10000, multiplier: 2.0 }
+                    ]
+                },
+                LASER_WIDTH: {
+                    name: 'Laser Width',
+                    levels: [
+                        { cost: 500, multiplier: 1.5 },
+                        { cost: 1000, multiplier: 2 },
+                        { cost: 2000, multiplier: 2.5 },
+                        { cost: 5000, multiplier: 3 },
+                        { cost: 10000, multiplier: 4 }
+                    ]
+                },
+                POWERUP_DURATION: {
+                    name: 'Power-up Duration',
+                    levels: [
+                        { cost: 500, multiplier: 1.2 },
+                        { cost: 1000, multiplier: 1.4 },
+                        { cost: 2000, multiplier: 1.6 },
+                        { cost: 5000, multiplier: 1.8 },
+                        { cost: 10000, multiplier: 2.0 }
+                    ]
+                },
+                SHIP_SPEED: {
+                    name: 'Ship Speed',
+                    levels: [
+                        { cost: 500, multiplier: 1.2 },
+                        { cost: 1000, multiplier: 1.4 },
+                        { cost: 2000, multiplier: 1.6 },
+                        { cost: 5000, multiplier: 1.8 },
+                        { cost: 10000, multiplier: 2.0 }
+                    ]
+                },
+                EXTRA_LIVES: {
+                    name: 'Extra Lives',
+                    levels: [
+                        { cost: 500, lives: 1 },
+                        { cost: 1000, lives: 2 },
+                        { cost: 2000, lives: 3 },
+                        { cost: 5000, lives: 4 },
+                        { cost: 10000, lives: 5 }
+                    ]
+                },
+                RAPID_FIRE: {
+                    name: 'Rapid Fire',
+                    levels: [
+                        { cost: 500, cooldown: 800 },    // 20% faster firing
+                        { cost: 1000, cooldown: 600 },   // 40% faster
+                        { cost: 2000, cooldown: 400 },   // 60% faster
+                        { cost: 5000, cooldown: 200 },   // 80% faster
+                        { cost: 10000, cooldown: 100 }   // Super fast firing
+                    ]
+                },
+                HEAT_RESISTANCE: {
+                    name: 'Heat Resistance',
+                    levels: [
+                        { cost: 500, reduction: 0.2 },   // 20% less heat per shot
+                        { cost: 1000, reduction: 0.4 },  // 40% less
+                        { cost: 2000, reduction: 0.6 },  // 60% less
+                        { cost: 5000, reduction: 0.8 },  // 80% less
+                        { cost: 10000, reduction: 0.9 }  // 90% less heat generation
+                    ]
+                },
+                SCORE_MULTIPLIER: {
+                    name: 'Score Multiplier',
+                    levels: [
+                        { cost: 1000, multiplier: 1.2 }, // 20% more points
+                        { cost: 2000, multiplier: 1.4 },
+                        { cost: 4000, multiplier: 1.6 },
+                        { cost: 8000, multiplier: 1.8 },
+                        { cost: 16000, multiplier: 2.0 } // Double points
+                    ]
+                },
+                POWERUP_CHANCE: {
+                    name: 'Power-up Frequency',
+                    levels: [
+                        { cost: 500, chance: 0.2 },    // 20% more frequent
+                        { cost: 1000, chance: 0.4 },   // 40% more
+                        { cost: 2000, chance: 0.6 },   // 60% more
+                        { cost: 5000, chance: 0.8 },   // 80% more
+                        { cost: 10000, chance: 1.0 }   // Double power-up frequency
+                    ]
+                },
+                SHIELD_STRENGTH: {
+                    name: 'Shield Strength',
+                    levels: [
+                        { cost: 1000, hits: 2 },     // Shield absorbs 2 hits
+                        { cost: 2000, hits: 3 },     // 3 hits
+                        { cost: 4000, hits: 4 },     // 4 hits
+                        { cost: 8000, hits: 5 },     // 5 hits
+                        { cost: 16000, hits: 6 }     // 6 hits before breaking
+                    ]
                 }
-            });
-        }
+            };
 
-        function createAsteroid() {
-            const asteroid = document.createElement('div');
-            asteroid.classList.add('asteroid');
-            gameContainer.appendChild(asteroid);
-            asteroids.push(asteroid);
-        
-            const size = Math.random() * (asteroidMaxSize - asteroidMinSize) + asteroidMinSize;
-            asteroid.style.width = `${size}px`;
-            asteroid.style.height = `${size}px`;
-        
-            // Randomize starting position (top, bottom, left, right edges)
-            const edge = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
-            let x, y;
-            
-            switch (edge) {
-                case 0: // Top
-                    x = Math.random() * containerWidth;
-                    y = -size;
-                    asteroid.speedY = Math.random() * 2 + 1; // Always move down
-                    asteroid.speedX = (Math.random() - 0.5) * 4 * asteroidSpeed;
-                    break;
-                case 1: // Right
-                    x = containerWidth + size;
-                    y = Math.random() * containerHeight;
-                    asteroid.speedX = -(Math.random() * 2 + 1); // Always move left
-                    asteroid.speedY = (Math.random() - 0.5) * 4 * asteroidSpeed;
-                    break;
-                case 2: // Bottom
-                    x = Math.random() * containerWidth;
-                    y = containerHeight + size;
-                    asteroid.speedY = -(Math.random() * 2 + 1); // Always move up
-                    asteroid.speedX = (Math.random() - 0.5) * 4 * asteroidSpeed;
-                    break;
-                case 3: // Left
-                    x = -size;
-                    y = Math.random() * containerHeight;
-                    asteroid.speedX = Math.random() * 2 + 1; // Always move right
-                    asteroid.speedY = (Math.random() - 0.5) * 4 * asteroidSpeed;
-                    break;
+            // Permanent stats store total accumulated score and upgrade levels.
+            let permanentStats = {
+                totalScore: 0,
+                upgradeLevels: {
+                    LASER_SPEED: 0,
+                    LASER_WIDTH: 0,
+                    POWERUP_DURATION: 0,
+                    SHIP_SPEED: 0,
+                    EXTRA_LIVES: 0,
+                    RAPID_FIRE: 0,
+                    HEAT_RESISTANCE: 0,
+                    SCORE_MULTIPLIER: 0,
+                    POWERUP_CHANCE: 0,
+                    SHIELD_STRENGTH: 0
+                }
+            };
+
+            // Load permanent stats from localStorage
+            const savedStats = localStorage.getItem('permanentStats');
+            if (savedStats) {
+                permanentStats = JSON.parse(savedStats);
+                // Apply saved upgrades immediately
+                lives = 3 + (permanentStats.upgradeLevels.EXTRA_LIVES > 0 
+                    ? upgradeTypes.EXTRA_LIVES.levels[permanentStats.upgradeLevels.EXTRA_LIVES - 1].lives 
+                    : 0);
+                livesDisplay.textContent = lives.toString();
             }
-        
-            asteroid.style.left = `${x}px`;
-            asteroid.style.top = `${y}px`;
-            asteroid.rotationSpeed = (Math.random() - 0.5) * 2;
-            asteroid.rotation = 0;
-            asteroid.size = size;
-        }
 
-        function updateAsteroids() {
-            asteroids.forEach((asteroid, index) => {
-                // Update position
-                let x = parseFloat(asteroid.style.left);
-                let y = parseFloat(asteroid.style.top);
-                x += asteroid.speedX;
-                y += asteroid.speedY;
+            // Function to initialize stars
+            function initializeStars() {
+                for (let i = 0; i < 100; i++) {
+                    createStar();
+                }
+            }
+
+            // Function to create a single star
+            function createStar() {
+                const star = document.createElement('div');
+                star.classList.add('star');
+                gameContainer.appendChild(star);
+                stars.push(star);
+
+                resetStar(star);
+            }
+            
+            function resetStar(star) {
+                const x = Math.random() * containerWidth;
+                const y = Math.random() * containerHeight;
+                const size = Math.random() * 2 + 1; 
+                const speed = Math.random() * 0.5 + 0.1; 
+
+                star.style.left = `${x}px`;
+                star.style.top = `${y}px`;
+                star.style.width = `${size}px`;
+                star.style.height = `${size}px`;
+                star.speed = speed;
+            }
+
+            function updateStars() {
+                stars.forEach(star => {
+                    let y = parseFloat(star.style.top);
+                    y += star.speed;
+                    if (y > containerHeight) {
+                        resetStar(star);
+                        star.style.top = `0px`;
+                    } else {
+                        star.style.top = `${y}px`;
+                    }
+                });
+            }
+
+            function createAsteroid() {
+                const asteroid = document.createElement('div');
+                asteroid.classList.add('asteroid');
+                gameContainer.appendChild(asteroid);
+                asteroids.push(asteroid);
+            
+                const size = Math.random() * (asteroidMaxSize - asteroidMinSize) + asteroidMinSize;
+                asteroid.style.width = `${size}px`;
+                asteroid.style.height = `${size}px`;
+            
+                // Randomize starting position (top, bottom, left, right edges)
+                const edge = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
+                let x, y;
+                
+                switch (edge) {
+                    case 0: // Top
+                        x = Math.random() * containerWidth;
+                        y = -size;
+                        asteroid.speedY = Math.random() * 2 + 1; // Always move down
+                        asteroid.speedX = (Math.random() - 0.5) * 4 * asteroidSpeed;
+                        break;
+                    case 1: // Right
+                        x = containerWidth + size;
+                        y = Math.random() * containerHeight;
+                        asteroid.speedX = -(Math.random() * 2 + 1); // Always move left
+                        asteroid.speedY = (Math.random() - 0.5) * 4 * asteroidSpeed;
+                        break;
+                    case 2: // Bottom
+                        x = Math.random() * containerWidth;
+                        y = containerHeight + size;
+                        asteroid.speedY = -(Math.random() * 2 + 1); // Always move up
+                        asteroid.speedX = (Math.random() - 0.5) * 4 * asteroidSpeed;
+                        break;
+                    case 3: // Left
+                        x = -size;
+                        y = Math.random() * containerHeight;
+                        asteroid.speedX = Math.random() * 2 + 1; // Always move right
+                        asteroid.speedY = (Math.random() - 0.5) * 4 * asteroidSpeed;
+                        break;
+                }
+            
                 asteroid.style.left = `${x}px`;
                 asteroid.style.top = `${y}px`;
-        
-                // Update rotation
-                asteroid.rotation += asteroid.rotationSpeed;
-                asteroid.style.transform = `rotate(${asteroid.rotation}deg)`;
-        
-                // Check for out of bounds
-                if (x + asteroid.offsetWidth < 0 || x > containerWidth || y + asteroid.offsetHeight < 0 || y > containerHeight) {
-                    asteroids.splice(index, 1);
-                    gameContainer.removeChild(asteroid);
-                }
-            });
-        }
-
-        function createShip() {
-            ship = document.createElement('div');
-            ship.classList.add('ship');
-            const flame = document.createElement('div');
-            flame.classList.add('flame');
-            ship.appendChild(flame);
-            gameContainer.appendChild(ship);
-            ship.style.left = `${shipX}px`;
-            ship.style.top = `${shipY}px`;
-        }
-
-        function moveShip() {
-            // Update speed based on pressed keys (with acceleration)
-            if (keysPressed['ArrowUp']) {
-                shipSpeedY = Math.max(shipSpeedY - shipAcceleration, -maxShipSpeed); // Accelerate up
-            } else if (keysPressed['ArrowDown']) {
-                shipSpeedY = Math.min(shipSpeedY + shipAcceleration, maxShipSpeed); // Accelerate down
-            } else {
-                shipSpeedY *= (1 - shipDeceleration); // Decelerate vertically when no key is pressed
+                asteroid.rotationSpeed = (Math.random() - 0.5) * 2;
+                asteroid.rotation = 0;
+                asteroid.size = size;
             }
 
-            if (keysPressed['ArrowLeft']) {
-                shipSpeedX = Math.max(shipSpeedX - shipAcceleration, -maxShipSpeed); // Accelerate left
-            } else if (keysPressed['ArrowRight']) {
-                shipSpeedX = Math.min(shipSpeedX + shipAcceleration, maxShipSpeed); // Accelerate right
-            } else {
-                shipSpeedX *= (1 - shipDeceleration); // Decelerate horizontally when no key is pressed
-            }
-
-            // Update ship position based on speed
-            shipX += shipSpeedX;
-            shipY += shipSpeedY;
-
-            // Keep ship within bounds
-            shipX = Math.max(0, Math.min(shipX, containerWidth - ship.offsetWidth));
-            shipY = Math.max(0, Math.min(shipY, containerHeight - ship.offsetHeight));
-
-            // Update ship's position
-            ship.style.left = `${shipX}px`;
-            ship.style.top = `${shipY}px`;
-        }
-
-        function createLaser() {
-            const currentTime = Date.now();
-            if (!canShoot || isOverheated || currentTime - lastShotTime < shotDelay) return;
+            function updateAsteroids() {
+                asteroids.forEach((asteroid, index) => {
+                    // Update position
+                    let x = parseFloat(asteroid.style.left);
+                    let y = parseFloat(asteroid.style.top);
+                    x += asteroid.speedX;
+                    y += asteroid.speedY;
+                    asteroid.style.left = `${x}px`;
+                    asteroid.style.top = `${y}px`;
             
-            lastShotTime = currentTime;
+                    // Update rotation
+                    asteroid.rotation += asteroid.rotationSpeed;
+                    asteroid.style.transform = `rotate(${asteroid.rotation}deg)`;
             
-            // Only add heat if unlimited fire is not active
-            if (!activeEffects.unlimitedFire) {
-                heatLevel += heatPerShot;
-                
-                if (heatLevel >= maxHeatLevel) {
-                    canShoot = false;
-                    startOverheatCooldown();
-                }
-            }
-
-            switch(weaponType) {
-                case 'spread':
-                    createSingleLaser(-30);
-                    createSingleLaser(0);
-                    createSingleLaser(30);
-                    break;
-                case 'laser':
-                    const laser = createSingleLaser(0);
-                    laser.style.height = '30px';
-                    laser.style.backgroundColor = '#f0f';
-                    break;
-                default:
-                    createSingleLaser(0);
-            }
-        }
-
-        function updateLasers() {
-            lasers.forEach((laser, index) => {
-                let x = parseFloat(laser.style.left);
-                let y = parseFloat(laser.style.top);
-                
-                // Update position using both X and Y speeds
-                x += laser.speedX;
-                y += laser.speedY;
-                
-                laser.style.left = `${x}px`;
-                laser.style.top = `${y}px`;
-
-                // Remove lasers that go off-screen
-                if (y < 0 || y > containerHeight || x < 0 || x > containerWidth) {
-                    lasers.splice(index, 1);
-                    gameContainer.removeChild(laser);
-                }
-            });
-        }
-
-        function updateRechargeBar() {
-            if (!canShoot) {
-                rechargeProgress += (1000 / rechargeTime); 
-                const fillWidth = Math.min(100, rechargeProgress);
-                rechargeBarFill.style.width = `${fillWidth}%`;
-
-                if (rechargeProgress >= 100) {
-                    canShoot = true;
-                    rechargeProgress = 0;
-                }
-            } else {
-                rechargeBarFill.style.width = '0%'; // Reset when not recharging
-            }
-        }
-
-        function checkCollisions() {
-            // Check for collision between ship and power-ups
-            powerUps.forEach((powerUp, powerUpIndex) => {
-                if (isColliding(ship, powerUp)) {
-                    collectPowerUp(powerUp);
-                    powerUps.splice(powerUpIndex, 1);
-                    gameContainer.removeChild(powerUp);
-                }
-            });
-            // Check laser-asteroid collisions
-            lasers.forEach((laser, laserIndex) => {
-                asteroids.forEach((asteroid, asteroidIndex) => {
-                    if (isColliding(laser, asteroid)) {
-                        // Create explosion effect
-                        createExplosion(asteroid.offsetLeft, asteroid.offsetTop);
-                        
-                        // Update score
-                        score += Math.round(asteroid.size * scoreMultiplier);
-                        scoreDisplay.textContent = score;
-
-                        // Chance to spawn power-up
-                        spawnPowerUp(asteroid.offsetLeft, asteroid.offsetTop, true);
-
-                        // Remove both laser and asteroid
-                        lasers.splice(laserIndex, 1);
-                        asteroids.splice(asteroidIndex, 1);
-                        gameContainer.removeChild(laser);
+                    // Check for out of bounds
+                    if (x + asteroid.offsetWidth < 0 || x > containerWidth || y + asteroid.offsetHeight < 0 || y > containerHeight) {
+                        asteroids.splice(index, 1);
                         gameContainer.removeChild(asteroid);
                     }
                 });
+            }
+
+            function createShip() {
+                ship = document.createElement('div');
+                ship.classList.add('ship');
+                const flame = document.createElement('div');
+                flame.classList.add('flame');
+                ship.appendChild(flame);
+                gameContainer.appendChild(ship);
+                ship.style.left = `${shipX}px`;
+                ship.style.top = `${shipY}px`;
+            }
+
+            // Update keyboard event handling
+            let keysPressed = new Set(); // Using Set instead of object for better key tracking
+
+            window.addEventListener('keydown', (event) => {
+                // Prevent default behavior
+                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(event.key)) {
+                    event.preventDefault();
+                }
+                keysPressed.add(event.key);
             });
 
-            // Check ship-asteroid collisions
-            asteroids.forEach((asteroid, asteroidIndex) => {
-                if (isColliding(ship, asteroid) && !activeEffects.shield) {
-                    lives--;
-                    livesDisplay.textContent = lives;
-                    createExplosion(asteroid.offsetLeft, asteroid.offsetTop);
-                    
-                    asteroids.splice(asteroidIndex, 1);
-                    gameContainer.removeChild(asteroid);
+            window.addEventListener('keyup', (event) => {
+                keysPressed.delete(event.key);
+            });
 
-                    if (lives === 0) {
-                        endGame();
+            // Add a separate event just for Space to ensure shooting always works
+            window.addEventListener('keypress', (event) => {
+                if (event.key === ' ') {
+                    event.preventDefault();
+                    if (canShoot && !isOverheated) {
+                        createLaser();
                     }
                 }
             });
-        }
-        
-        function isColliding(element1, element2) {
-            const rect1 = element1.getBoundingClientRect();
-            const rect2 = element2.getBoundingClientRect();
-        
-            return !(rect1.right < rect2.left || 
-                     rect1.left > rect2.right || 
-                     rect1.bottom < rect2.top || 
-                     rect1.top > rect2.bottom);
-        }
-        
-        
-        function createAsteroidFragments(asteroid) {
-            const numFragments = Math.floor(Math.random() * 3) + 2; // 2 to 4 fragments
-            const originalSize = asteroid.size;
-            const fragmentSize = originalSize / numFragments;
-        
-            for (let i = 0; i < numFragments; i++) {
-                const fragment = document.createElement('div');
-                fragment.classList.add('asteroid');
-                gameContainer.appendChild(fragment);
-        
-                fragment.style.width = `${fragmentSize}px`;
-                fragment.style.height = `${fragmentSize}px`;
-                fragment.style.left = asteroid.style.left;
-                fragment.style.top = asteroid.style.top;
-        
-                // Assign random speeds to fragments, different from the original asteroid
-                fragment.speedX = (Math.random() - 0.5) * 6; // Slightly faster than original asteroids
-                fragment.speedY = (Math.random() - 0.5) * 6;
-                fragment.rotationSpeed = (Math.random() - 0.5) * 3;
-                fragment.rotation = 0;
-                fragment.size = fragmentSize;
-        
-                asteroids.push(fragment);
-            }
-        }
 
-        function resetShipPosition() {
-            shipX = containerWidth / 2 - ship.offsetWidth / 2;
-            shipY = containerHeight / 2 - ship.offsetHeight / 2;
-            ship.style.left = `${shipX}px`;
-            ship.style.top = `${shipY}px`;
-            shipSpeedX = 0;
-            shipSpeedY = 0;
-        }
+            // Update the gameLoop function
+            function gameLoop() {
+                if (isGameOver) return;
 
-        function endGame() {
-            isGameOver = true;
-            // Add the current score to totalScore in permanentStats
-            permanentStats.totalScore += score;
-            localStorage.setItem('permanentStats', JSON.stringify(permanentStats));
-            saveGameState();  
-            showUpgradeScreen();
-        }
-
-        function restartGame() {
-            // Hide game over screen
-            gameOverScreen.style.display = 'none';
-            // Reset per-run variables
-            score = 0;
-            lives = 3;
-            scoreDisplay.textContent = score.toString();
-            livesDisplay.textContent = lives.toString();
-            isGameOver = false;
-
-            // Clear asteroids, lasers, powerUps if needed
-            asteroids.forEach(a => gameContainer.removeChild(a));
-            asteroids = [];
-            lasers.forEach(l => gameContainer.removeChild(l));
-            lasers = [];
-            powerUps.forEach(p => gameContainer.removeChild(p));
-            powerUps = [];
-
-            // Reset ship position and other gameplay variables
-            resetShipPosition();
-            startGameLoop();
-        }
-
-        // Modified key event listeners to handle multiple keys
-        let keysPressed = {};
-
-        window.addEventListener('keydown', (event) => {
-            keysPressed[event.code] = true; // Use event.code instead of event.key
-            
-            // Check if the Space key is pressed along with other keys
-            if (keysPressed['Space'] && canShoot) {
-                createLaser();
-            } else if (keysPressed['KeyH'] && hyperspaceCharges > 0) {
-                activateHyperspace();
-            }
-
-            event.preventDefault();
-        });
-
-        window.addEventListener('keyup', (event) => {
-            keysPressed[event.code] = false; // Use event.code
-        });
-
-        function activateHyperspace() {
-            hyperspaceCharges--;
-            isHyperspaceActive = true;
-        
-            // Small chance of malfunction
-            if (Math.random() < 0.1) { // 10% chance of malfunction
-                // Place ship in a random asteroid's path
-                const randomAsteroid = asteroids[Math.floor(Math.random() * asteroids.length)];
-                if (randomAsteroid) {
-                    shipX = parseFloat(randomAsteroid.style.left) - ship.offsetWidth / 2;
-                    shipY = parseFloat(randomAsteroid.style.top) - randomAsteroid.offsetHeight / 2;
+                // Handle shooting in both keypress and gameLoop for redundancy
+                if (keysPressed.has(' ') && canShoot && !isOverheated) {
+                    createLaser();
                 }
-            } else {
-                // Normal hyperspace jump
-                shipX = Math.random() * (containerWidth - ship.offsetWidth);
-                shipY = Math.random() * (containerHeight - ship.offsetHeight);
+
+                // Handle movement
+                let dx = 0;
+                let dy = 0;
+
+                if (keysPressed.has('ArrowLeft')) dx -= 1;
+                if (keysPressed.has('ArrowRight')) dx += 1;
+                if (keysPressed.has('ArrowUp')) dy -= 1;
+                if (keysPressed.has('ArrowDown')) dy += 1;
+
+                // Update ship speed
+                shipSpeedX += dx * shipAcceleration;
+                shipSpeedY += dy * shipAcceleration;
+
+                // Apply deceleration
+                shipSpeedX *= (1 - shipDeceleration);
+                shipSpeedY *= (1 - shipDeceleration);
+
+                // Limit speed
+                shipSpeedX = Math.max(-maxShipSpeed, Math.min(maxShipSpeed, shipSpeedX));
+                shipSpeedY = Math.max(-maxShipSpeed, Math.min(maxShipSpeed, shipSpeedY));
+
+                // Update ship position
+                shipX += shipSpeedX;
+                shipY += shipSpeedY;
+
+                // Keep ship within bounds
+                shipX = Math.max(0, Math.min(shipX, containerWidth - ship.offsetWidth));
+                shipY = Math.max(0, Math.min(shipY, containerHeight - ship.offsetHeight));
+
+                ship.style.left = `${shipX}px`;
+                ship.style.top = `${shipY}px`;
+
+                // Rest of gameLoop remains the same
+                updateLasers();
+                updateAsteroids();
+                checkCollisions();
+                updateRechargeBar();
+                updateStars();
+                updatePowerUps();
+                updateHeatMeter();
             }
-        
-            ship.style.left = `${shipX}px`;
-            ship.style.top = `${shipY}px`;
-        
-            setTimeout(() => {
-                isHyperspaceActive = false;
-            }, 500); 
-        }
 
-        function gameLoop() {
-            if (isGameOver) return;
-
-            moveShip();
-            updateLasers();
-            updateAsteroids();
-            checkCollisions();
-            updateRechargeBar();
-            updateStars();
-            updatePowerUps();
-            updateHeatMeter();
-
-            const currentTime = Date.now();
-            if (currentTime - lastAsteroidSpawnTime > asteroidSpawnInterval) {
-                createAsteroid();
-                lastAsteroidSpawnTime = currentTime;
-
-                // Increase difficulty over time
-                asteroidSpawnInterval = Math.max(500, asteroidSpawnInterval * 0.99); // Reduce interval, but not below 500ms
-            }
-            if (currentTime % 5000 < 20) saveGameState();
-            // Random power-up spawn
-            spawnPowerUp(0, 0, false);
-        }
-        
-        function startGameLoop() {
-            clearInterval(gameLoopInterval);
-            gameLoopInterval = setInterval(gameLoop, 20); // Run the loop every 20ms
-        }
-        
-        // Initialize stars and ship
-        initializeStars();
-        createShip();
-        
-        // Start the game loop
-        startGameLoop();
-
-        function createPowerUp(type) {
-            const powerUp = document.createElement('div');
-            powerUp.classList.add('power-up');
-            powerUp.classList.add(type); // This needs to match the CSS class name
-            powerUp.type = type;
-            
-            let spawnX, spawnY;
-            switch(Math.floor(Math.random() * 4)) {
-                case 0: // Top
-                    spawnX = Math.random() * (containerWidth - 20);
-                    spawnY = -20;
-                    powerUp.speedX = (Math.random() - 0.5) * 2;
-                    powerUp.speedY = Math.random() * 1.5 + 1; // Always positive (down)
-                    break;
-                case 1: // Right
-                    spawnX = containerWidth;
-                    spawnY = Math.random() * (containerHeight - 20);
-                    powerUp.speedX = -(Math.random() * 1.5 + 1); // Always negative (left)
-                    powerUp.speedY = (Math.random() - 0.5) * 2;
-                    break;
-                case 2: // Bottom
-                    spawnX = Math.random() * (containerWidth - 20);
-                    spawnY = containerHeight;
-                    powerUp.speedX = (Math.random() - 0.5) * 2;
-                    powerUp.speedY = -(Math.random() * 1.5 + 1); // Always negative (up)
-                    break;
-                case 3: // Left
-                    spawnX = -20;
-                    spawnY = Math.random() * (containerHeight - 20);
-                    powerUp.speedX = Math.random() * 1.5 + 1; // Always positive (right)
-                    powerUp.speedY = (Math.random() - 0.5) * 2;
-                    break;
-            }
-            powerUp.style.left = `${spawnX}px`;
-            powerUp.style.top = `${spawnY}px`;
-            
-            gameContainer.appendChild(powerUp);
-            powerUps.push(powerUp);
-        }
-
-        function activateShield() {
-            // Clear existing timeout if any
-            if (activeEffects.shield) {
-                clearTimeout(activeEffects.shieldTimer);
-            } else {
-                // Only create shield if it wasn't already active
-                activeEffects.shield = true;
-                if (!shieldElement) {
-                    shieldElement = document.createElement('div');
-                    shieldElement.classList.add('shield');
-                    shieldElement.style.transform = 'translate(-15px, -12.5px)';
-                    ship.appendChild(shieldElement);
-                }
-            }
-            
-            updateStatusText('SHIELD', 7000);
-
-            activeEffects.shieldTimer = setTimeout(() => {
-                activeEffects.shield = false;
-                if (shieldElement && shieldElement.parentNode === ship) {
-                    ship.removeChild(shieldElement);
-                }
-                shieldElement = null;
-            }, 7000);
-        }
-
-        function activateTripleShot() {
-            // Clear existing timeout if any
-            if (activeEffects.tripleShot) {
-                clearTimeout(activeEffects.tripleShotTimer);
-            } else {
-                // Only set these if it wasn't already active
-                activeEffects.tripleShot = true;
-                weaponType = 'spread';
-            }
-            
-            updateStatusText('TRIPLE SHOT', 6000);
-
-            activeEffects.tripleShotTimer = setTimeout(() => {
-                activeEffects.tripleShot = false;
-                weaponType = 'normal';
-            }, 6000);
-        }
-
-        function createExplosion(x, y) {
-            const explosion = document.createElement('div');
-            explosion.classList.add('explosion');
-            explosion.style.left = `${x}px`;
-            explosion.style.top = `${y}px`;
-            gameContainer.appendChild(explosion);
-            
-            setTimeout(() => {
-                gameContainer.removeChild(explosion);
-            }, 500);
-        }
-
-        function updateMultiplier(value) {
-            scoreMultiplier = value;
-            document.getElementById('multiplier').textContent = `${value}x`;
-            
-            clearTimeout(multiplierTimer);
-            multiplierTimer = setTimeout(() => {
-                scoreMultiplier = 1;
-                document.getElementById('multiplier').textContent = '1x';
-            }, 5000);
-        }
-
-        function increaseDifficulty() {
-            level++;
-            asteroidSpeed *= 1.2;
-            asteroidSpawnRate *= 1.2;
-            asteroidSpawnInterval = Math.max(500, 2000 - (level * 100));
-            
-            // Create a level-up notification
-            const levelUp = document.createElement('div');
-            levelUp.textContent = `Level ${level}!`;
-            levelUp.style.position = 'absolute';
-            levelUp.style.color = '#ff0';
-            levelUp.style.fontSize = '24px';
-            levelUp.style.left = '50%';
-            levelUp.style.top = '50%';
-            levelUp.style.transform = 'translate(-50%, -50%)';
-            gameContainer.appendChild(levelUp);
-            
-            setTimeout(() => gameContainer.removeChild(levelUp), 2000);
-        }
-
-        function handleAsteroidDestruction(asteroid) {
-            const currentTime = Date.now();
-            if (currentTime - lastKillTime < comboTimeout) {
-                combo++;
-                scoreMultiplier = 1 + (combo * 0.1); // Each combo adds 10% to score
-            } else {
-                combo = 1;
-                scoreMultiplier = 1;
-            }
-            lastKillTime = currentTime;
-            
-            // Visual feedback
-            const comboText = document.createElement('div');
-            comboText.textContent = `${combo}x Combo!`;
-            comboText.style.position = 'absolute';
-            comboText.style.color = `hsl(${combo * 30}, 100%, 50%)`; // Color changes with combo
-            comboText.style.fontSize = `${16 + (combo * 2)}px`;
-            comboText.style.left = `${asteroid.offsetLeft}px`;
-            comboText.style.top = `${asteroid.offsetTop}px`;
-            gameContainer.appendChild(comboText);
-            
-            setTimeout(() => gameContainer.removeChild(comboText), 1000);
-        }
-
-        // Add new class for space anomalies
-        class SpaceAnomaly {
-            constructor(type) {
-                this.element = document.createElement('div');
-                this.element.classList.add('anomaly', type);
-                this.type = type;
-                this.x = Math.random() * containerWidth;
-                this.y = Math.random() * containerHeight;
-                this.size = 50;
-                this.active = true;
+            function createLaser() {
+                const currentTime = Date.now();
+                if (!canShoot || isOverheated || currentTime - lastShotTime < shotDelay) return;
                 
-                gameContainer.appendChild(this.element);
-                this.update();
+                lastShotTime = currentTime;
+                
+                // Only add heat if unlimited fire is not active
+                if (!activeEffects.unlimitedFire) {
+                    heatLevel += heatPerShot;
+                    
+                    if (heatLevel >= maxHeatLevel) {
+                        canShoot = false;
+                        startOverheatCooldown();
+                    }
+                }
+
+                switch(weaponType) {
+                    case 'spread':
+                        createSingleLaser(-30);
+                        createSingleLaser(0);
+                        createSingleLaser(30);
+                        break;
+                    case 'laser':
+                        const laser = createSingleLaser(0);
+                        laser.style.height = '30px';
+                        laser.style.backgroundColor = '#f0f';
+                        break;
+                    default:
+                        createSingleLaser(0);
+                }
             }
-            
-            update() {
-                if (this.type === 'blackhole') {
-                    // Pull nearby objects
-                    asteroids.forEach(asteroid => {
-                        const dx = this.x - parseFloat(asteroid.style.left);
-                        const dy = this.y - parseFloat(asteroid.style.top);
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        if (dist < 200) {
-                            asteroid.speedX += (dx / dist) * 0.5;
-                            asteroid.speedY += (dy / dist) * 0.5;
+
+            function updateLasers() {
+                lasers.forEach((laser, index) => {
+                    let x = parseFloat(laser.style.left);
+                    let y = parseFloat(laser.style.top);
+                    
+                    // Update position using both X and Y speeds
+                    x += laser.speedX;
+                    y += laser.speedY;
+                    
+                    laser.style.left = `${x}px`;
+                    laser.style.top = `${y}px`;
+
+                    // Remove lasers that go off-screen
+                    if (y < 0 || y > containerHeight || x < 0 || x > containerWidth) {
+                        lasers.splice(index, 1);
+                        gameContainer.removeChild(laser);
+                    }
+                });
+            }
+
+            function updateRechargeBar() {
+                if (!canShoot) {
+                    rechargeProgress += (1000 / rechargeTime); 
+                    const fillWidth = Math.min(100, rechargeProgress);
+                    rechargeBarFill.style.width = `${fillWidth}%`;
+
+                    if (rechargeProgress >= 100) {
+                        canShoot = true;
+                        rechargeProgress = 0;
+                    }
+                } else {
+                    rechargeBarFill.style.width = '0%'; // Reset when not recharging
+                }
+            }
+
+            function checkCollisions() {
+                // Check for collision between ship and power-ups
+                powerUps.forEach((powerUp, powerUpIndex) => {
+                    if (isColliding(ship, powerUp)) {
+                        collectPowerUp(powerUp);
+                        powerUps.splice(powerUpIndex, 1);
+                        gameContainer.removeChild(powerUp);
+                    }
+                });
+                // Check laser-asteroid collisions
+                lasers.forEach((laser, laserIndex) => {
+                    asteroids.forEach((asteroid, asteroidIndex) => {
+                        if (isColliding(laser, asteroid)) {
+                            // Create explosion effect
+                            createExplosion(asteroid.offsetLeft, asteroid.offsetTop);
+                            
+                            // Update score
+                            score += Math.round(asteroid.size * scoreMultiplier);
+                            scoreDisplay.textContent = score;
+
+                            // Chance to spawn power-up
+                            spawnPowerUp(asteroid.offsetLeft, asteroid.offsetTop, true);
+
+                            // Remove both laser and asteroid
+                            lasers.splice(laserIndex, 1);
+                            asteroids.splice(asteroidIndex, 1);
+                            gameContainer.removeChild(laser);
+                            gameContainer.removeChild(asteroid);
                         }
                     });
+                });
+
+                // Check ship-asteroid collisions
+                asteroids.forEach((asteroid, asteroidIndex) => {
+                    if (isColliding(ship, asteroid) && !activeEffects.shield) {
+                        lives--;
+                        livesDisplay.textContent = lives;
+                        createExplosion(asteroid.offsetLeft, asteroid.offsetTop);
+                        
+                        asteroids.splice(asteroidIndex, 1);
+                        gameContainer.removeChild(asteroid);
+
+                        if (lives === 0) {
+                            endGame();
+                        }
+                    }
+                });
+            }
+            
+            function isColliding(element1, element2) {
+                const rect1 = element1.getBoundingClientRect();
+                const rect2 = element2.getBoundingClientRect();
+            
+                return !(rect1.right < rect2.left || 
+                         rect1.left > rect2.right || 
+                         rect1.bottom < rect2.top || 
+                         rect1.top > rect2.bottom);
+            }
+            
+            
+            function createAsteroidFragments(asteroid) {
+                const numFragments = Math.floor(Math.random() * 3) + 2; // 2 to 4 fragments
+                const originalSize = asteroid.size;
+                const fragmentSize = originalSize / numFragments;
+            
+                for (let i = 0; i < numFragments; i++) {
+                    const fragment = document.createElement('div');
+                    fragment.classList.add('asteroid');
+                    gameContainer.appendChild(fragment);
+            
+                    fragment.style.width = `${fragmentSize}px`;
+                    fragment.style.height = `${fragmentSize}px`;
+                    fragment.style.left = asteroid.style.left;
+                    fragment.style.top = asteroid.style.top;
+            
+                    // Assign random speeds to fragments, different from the original asteroid
+                    fragment.speedX = (Math.random() - 0.5) * 6; // Slightly faster than original asteroids
+                    fragment.speedY = (Math.random() - 0.5) * 6;
+                    fragment.rotationSpeed = (Math.random() - 0.5) * 3;
+                    fragment.rotation = 0;
+                    fragment.size = fragmentSize;
+            
+                    asteroids.push(fragment);
                 }
             }
-        }
 
-        function createSingleLaser(angle = 0) {
-            const laser = document.createElement('div');
-            laser.classList.add('laser');
-            gameContainer.appendChild(laser);
-            lasers.push(laser);
+            function resetShipPosition() {
+                shipX = containerWidth / 2 - ship.offsetWidth / 2;
+                shipY = containerHeight / 2 - ship.offsetHeight / 2;
+                ship.style.left = `${shipX}px`;
+                ship.style.top = `${shipY}px`;
+                shipSpeedX = 0;
+                shipSpeedY = 0;
+            }
 
-            // Position laser at ship's tip
-            const shipTipX = shipX + (ship.offsetWidth / 2) - (laser.offsetWidth / 2);
-            const shipTipY = shipY;
+            function endGame() {
+                isGameOver = true;
+                // Add the current score to totalScore in permanentStats
+                permanentStats.totalScore += score;
+                localStorage.setItem('permanentStats', JSON.stringify(permanentStats));
+                saveGameState();  
+                showUpgradeScreen();
+            }
 
-            laser.style.left = `${shipTipX}px`;
-            laser.style.top = `${shipTipY}px`;
+            function restartGame() {
+                // Hide game over screen
+                gameOverScreen.style.display = 'none';
+                // Reset per-run variables
+                score = 0;
+                lives = 3;
+                scoreDisplay.textContent = score.toString();
+                livesDisplay.textContent = lives.toString();
+                isGameOver = false;
 
-            // Calculate angle-based velocity
-            const angleRad = (angle + shipRotation) * (Math.PI / 180);
-            laser.speedX = Math.sin(angleRad) * laserSpeed;
-            laser.speedY = -Math.cos(angleRad) * laserSpeed;
+                // Clear asteroids, lasers, powerUps if needed
+                asteroids.forEach(a => gameContainer.removeChild(a));
+                asteroids = [];
+                lasers.forEach(l => gameContainer.removeChild(l));
+                lasers = [];
+                powerUps.forEach(p => gameContainer.removeChild(p));
+                powerUps = [];
 
-            return laser;
-        }
+                // Reset ship position and other gameplay variables
+                resetShipPosition();
+                startGameLoop();
+            }
 
-        function spawnPowerUp(x, y, fromAsteroid = false) {
-            if ((fromAsteroid && Math.random() < 0.15) || (!fromAsteroid && Math.random() < 0.001)) {
+            // Separate shooting function
+            function tryShoot() {
+                if (canShoot && !isGameOver && !isOverheated) {
+                    createLaser();
+                }
+            }
+
+            function activateHyperspace() {
+                hyperspaceCharges--;
+                isHyperspaceActive = true;
+            
+                // Small chance of malfunction
+                if (Math.random() < 0.1) { // 10% chance of malfunction
+                    // Place ship in a random asteroid's path
+                    const randomAsteroid = asteroids[Math.floor(Math.random() * asteroids.length)];
+                    if (randomAsteroid) {
+                        shipX = parseFloat(randomAsteroid.style.left) - ship.offsetWidth / 2;
+                        shipY = parseFloat(randomAsteroid.style.top) - randomAsteroid.offsetHeight / 2;
+                    }
+                } else {
+                    // Normal hyperspace jump
+                    shipX = Math.random() * (containerWidth - ship.offsetWidth);
+                    shipY = Math.random() * (containerHeight - ship.offsetHeight);
+                }
+            
+                ship.style.left = `${shipX}px`;
+                ship.style.top = `${shipY}px`;
+            
+                setTimeout(() => {
+                    isHyperspaceActive = false;
+                }, 500); 
+            }
+
+            function startGameLoop() {
+                clearInterval(gameLoopInterval);
+                gameLoopInterval = setInterval(gameLoop, 20); // Run the loop every 20ms
+            }
+            
+            // Initialize stars and ship
+            initializeStars();
+            createShip();
+            
+            // Start the game loop
+            startGameLoop();
+
+            function createPowerUp(type) {
                 const powerUp = document.createElement('div');
                 powerUp.classList.add('power-up');
-                
-                const types = Object.values(powerUpTypes);
-                const type = types[Math.floor(Math.random() * types.length)];
-                powerUp.classList.add(type);
+                powerUp.classList.add(type); // This needs to match the CSS class name
                 powerUp.type = type;
                 
-                if (fromAsteroid) {
-                    powerUp.style.left = `${x}px`;
-                    powerUp.style.top = `${y}px`;
-                    powerUp.speedX = (Math.random() - 0.5) * 2;
-                    powerUp.speedY = (Math.random() - 0.5) * 2;
-                } else {
-                    const edge = Math.floor(Math.random() * 4);
-                    let spawnX, spawnY;
-                    
-                    switch (edge) {
-                        case 0: // Top
-                            spawnX = Math.random() * (containerWidth - 20);
-                            spawnY = -20;
-                            powerUp.speedY = Math.random() * 1.5 + 1; // Always positive (down)
-                            powerUp.speedX = (Math.random() - 0.5) * 2;
-                            break;
-                        case 1: // Right
-                            spawnX = containerWidth + 20;
-                            spawnY = Math.random() * (containerHeight - 20);
-                            powerUp.speedX = -(Math.random() * 1.5 + 1); // Always negative (left)
-                            powerUp.speedY = (Math.random() - 0.5) * 2;
-                            break;
-                        case 2: // Bottom
-                            spawnX = Math.random() * (containerWidth - 20);
-                            spawnY = containerHeight + 20;
-                            powerUp.speedY = -(Math.random() * 1.5 + 1); // Always negative (up)
-                            powerUp.speedX = (Math.random() - 0.5) * 2;
-                            break;
-                        case 3: // Left
-                            spawnX = -20;
-                            spawnY = Math.random() * (containerHeight - 20);
-                            powerUp.speedX = Math.random() * 1.5 + 1; // Always positive (right)
-                            powerUp.speedY = (Math.random() - 0.5) * 2;
-                            break;
-                    }
-                    powerUp.style.left = `${spawnX}px`;
-                    powerUp.style.top = `${spawnY}px`;
+                let spawnX, spawnY;
+                switch(Math.floor(Math.random() * 4)) {
+                    case 0: // Top
+                        spawnX = Math.random() * (containerWidth - 20);
+                        spawnY = -20;
+                        powerUp.speedX = (Math.random() - 0.5) * 2;
+                        powerUp.speedY = Math.random() * 1.5 + 1; // Always positive (down)
+                        break;
+                    case 1: // Right
+                        spawnX = containerWidth;
+                        spawnY = Math.random() * (containerHeight - 20);
+                        powerUp.speedX = -(Math.random() * 1.5 + 1); // Always negative (left)
+                        powerUp.speedY = (Math.random() - 0.5) * 2;
+                        break;
+                    case 2: // Bottom
+                        spawnX = Math.random() * (containerWidth - 20);
+                        spawnY = containerHeight;
+                        powerUp.speedX = (Math.random() - 0.5) * 2;
+                        powerUp.speedY = -(Math.random() * 1.5 + 1); // Always negative (up)
+                        break;
+                    case 3: // Left
+                        spawnX = -20;
+                        spawnY = Math.random() * (containerHeight - 20);
+                        powerUp.speedX = Math.random() * 1.5 + 1; // Always positive (right)
+                        powerUp.speedY = (Math.random() - 0.5) * 2;
+                        break;
                 }
+                powerUp.style.left = `${spawnX}px`;
+                powerUp.style.top = `${spawnY}px`;
                 
                 gameContainer.appendChild(powerUp);
                 powerUps.push(powerUp);
+            }
+
+            function activateShield() {
+                // Clear existing timeout if any
+                if (activeEffects.shield) {
+                    clearTimeout(activeEffects.shieldTimer);
+                } else {
+                    // Only create shield if it wasn't already active
+                    activeEffects.shield = true;
+                    if (!shieldElement) {
+                        shieldElement = document.createElement('div');
+                        shieldElement.classList.add('shield');
+                        shieldElement.style.transform = 'translate(-15px, -12.5px)';
+                        ship.appendChild(shieldElement);
+                    }
+                }
                 
-                // Remove power-up after 7 seconds
+                updateStatusText('SHIELD', 7000);
+
+                activeEffects.shieldTimer = setTimeout(() => {
+                    activeEffects.shield = false;
+                    if (shieldElement && shieldElement.parentNode === ship) {
+                        ship.removeChild(shieldElement);
+                    }
+                    shieldElement = null;
+                }, 7000);
+            }
+
+            function activateTripleShot() {
+                // Clear existing timeout if any
+                if (activeEffects.tripleShot) {
+                    clearTimeout(activeEffects.tripleShotTimer);
+                } else {
+                    // Only set these if it wasn't already active
+                    activeEffects.tripleShot = true;
+                    weaponType = 'spread';
+                }
+                
+                updateStatusText('TRIPLE SHOT', 6000);
+
+                activeEffects.tripleShotTimer = setTimeout(() => {
+                    activeEffects.tripleShot = false;
+                    weaponType = 'normal';
+                }, 6000);
+            }
+
+            function createExplosion(x, y) {
+                const explosion = document.createElement('div');
+                explosion.classList.add('explosion');
+                explosion.style.left = `${x}px`;
+                explosion.style.top = `${y}px`;
+                gameContainer.appendChild(explosion);
+                
                 setTimeout(() => {
-                    if (powerUps.includes(powerUp)) {
+                    gameContainer.removeChild(explosion);
+                }, 500);
+            }
+
+            function updateMultiplier(value) {
+                scoreMultiplier = value;
+                document.getElementById('multiplier').textContent = `${value}x`;
+                
+                clearTimeout(multiplierTimer);
+                multiplierTimer = setTimeout(() => {
+                    scoreMultiplier = 1;
+                    document.getElementById('multiplier').textContent = '1x';
+                }, 5000);
+            }
+
+            function increaseDifficulty() {
+                level++;
+                asteroidSpeed *= 1.2;
+                asteroidSpawnRate *= 1.2;
+                asteroidSpawnInterval = Math.max(500, 2000 - (level * 100));
+                
+                // Create a level-up notification
+                const levelUp = document.createElement('div');
+                levelUp.textContent = `Level ${level}!`;
+                levelUp.style.position = 'absolute';
+                levelUp.style.color = '#ff0';
+                levelUp.style.fontSize = '24px';
+                levelUp.style.left = '50%';
+                levelUp.style.top = '50%';
+                levelUp.style.transform = 'translate(-50%, -50%)';
+                gameContainer.appendChild(levelUp);
+                
+                setTimeout(() => gameContainer.removeChild(levelUp), 2000);
+            }
+
+            function handleAsteroidDestruction(asteroid) {
+                const currentTime = Date.now();
+                if (currentTime - lastKillTime < comboTimeout) {
+                    combo++;
+                    scoreMultiplier = 1 + (combo * 0.1); // Each combo adds 10% to score
+                } else {
+                    combo = 1;
+                    scoreMultiplier = 1;
+                }
+                lastKillTime = currentTime;
+                
+                // Visual feedback
+                const comboText = document.createElement('div');
+                comboText.textContent = `${combo}x Combo!`;
+                comboText.style.position = 'absolute';
+                comboText.style.color = `hsl(${combo * 30}, 100%, 50%)`; // Color changes with combo
+                comboText.style.fontSize = `${16 + (combo * 2)}px`;
+                comboText.style.left = `${asteroid.offsetLeft}px`;
+                comboText.style.top = `${asteroid.offsetTop}px`;
+                gameContainer.appendChild(comboText);
+                
+                setTimeout(() => gameContainer.removeChild(comboText), 1000);
+            }
+
+            // Add new class for space anomalies
+            class SpaceAnomaly {
+                constructor(type) {
+                    this.element = document.createElement('div');
+                    this.element.classList.add('anomaly', type);
+                    this.type = type;
+                    this.x = Math.random() * containerWidth;
+                    this.y = Math.random() * containerHeight;
+                    this.size = 50;
+                    this.active = true;
+                    
+                    gameContainer.appendChild(this.element);
+                    this.update();
+                }
+                
+                update() {
+                    if (this.type === 'blackhole') {
+                        // Pull nearby objects
+                        asteroids.forEach(asteroid => {
+                            const dx = this.x - parseFloat(asteroid.style.left);
+                            const dy = this.y - parseFloat(asteroid.style.top);
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist < 200) {
+                                asteroid.speedX += (dx / dist) * 0.5;
+                                asteroid.speedY += (dy / dist) * 0.5;
+                            }
+                        });
+                    }
+                }
+            }
+
+            function createSingleLaser(angle = 0) {
+                const laser = document.createElement('div');
+                laser.classList.add('laser');
+                
+                // Apply laser width upgrade if available
+                if (permanentStats.upgradeLevels.LASER_WIDTH > 0) {
+                    const width = upgradeTypes.LASER_WIDTH.levels[permanentStats.upgradeLevels.LASER_WIDTH - 1].width;
+                    laser.style.width = `${width}px`;
+                }
+                
+                gameContainer.appendChild(laser);
+                lasers.push(laser);
+
+                // Position laser at ship's tip
+                const shipTipX = shipX + (ship.offsetWidth / 2) - (laser.offsetWidth / 2);
+                const shipTipY = shipY;
+
+                laser.style.left = `${shipTipX}px`;
+                laser.style.top = `${shipTipY}px`;
+
+                // Calculate angle-based velocity
+                const angleRad = (angle + shipRotation) * (Math.PI / 180);
+                laser.speedX = Math.sin(angleRad) * laserSpeed;
+                laser.speedY = -Math.cos(angleRad) * laserSpeed;
+
+                return laser;
+            }
+
+            function spawnPowerUp(x, y, fromAsteroid = false) {
+                if ((fromAsteroid && Math.random() < 0.15) || (!fromAsteroid && Math.random() < 0.001)) {
+                    const powerUp = document.createElement('div');
+                    powerUp.classList.add('power-up');
+                    
+                    const types = Object.values(powerUpTypes);
+                    const type = types[Math.floor(Math.random() * types.length)];
+                    powerUp.classList.add(type);
+                    powerUp.type = type;
+                    
+                    if (fromAsteroid) {
+                        powerUp.style.left = `${x}px`;
+                        powerUp.style.top = `${y}px`;
+                        powerUp.speedX = (Math.random() - 0.5) * 2;
+                        powerUp.speedY = (Math.random() - 0.5) * 2;
+                    } else {
+                        const edge = Math.floor(Math.random() * 4);
+                        let spawnX, spawnY;
+                        
+                        switch (edge) {
+                            case 0: // Top
+                                spawnX = Math.random() * (containerWidth - 20);
+                                spawnY = -20;
+                                powerUp.speedY = Math.random() * 1.5 + 1; // Always positive (down)
+                                powerUp.speedX = (Math.random() - 0.5) * 2;
+                                break;
+                            case 1: // Right
+                                spawnX = containerWidth + 20;
+                                spawnY = Math.random() * (containerHeight - 20);
+                                powerUp.speedX = -(Math.random() * 1.5 + 1); // Always negative (left)
+                                powerUp.speedY = (Math.random() - 0.5) * 2;
+                                break;
+                            case 2: // Bottom
+                                spawnX = Math.random() * (containerWidth - 20);
+                                spawnY = containerHeight + 20;
+                                powerUp.speedY = -(Math.random() * 1.5 + 1); // Always negative (up)
+                                powerUp.speedX = (Math.random() - 0.5) * 2;
+                                break;
+                            case 3: // Left
+                                spawnX = -20;
+                                spawnY = Math.random() * (containerHeight - 20);
+                                powerUp.speedX = Math.random() * 1.5 + 1; // Always positive (right)
+                                powerUp.speedY = (Math.random() - 0.5) * 2;
+                                break;
+                        }
+                        powerUp.style.left = `${spawnX}px`;
+                        powerUp.style.top = `${spawnY}px`;
+                    }
+                    
+                    gameContainer.appendChild(powerUp);
+                    powerUps.push(powerUp);
+                    
+                    // Remove power-up after 7 seconds
+                    setTimeout(() => {
+                        if (powerUps.includes(powerUp)) {
+                            powerUps = powerUps.filter(p => p !== powerUp);
+                            gameContainer.removeChild(powerUp);
+                        }
+                    }, 7000);
+                }
+            }
+
+            function updatePowerUps() {
+                powerUps.forEach((powerUp, index) => {
+                    let x = parseFloat(powerUp.style.left);
+                    let y = parseFloat(powerUp.style.top);
+                    
+                    x += powerUp.speedX;
+                    y += powerUp.speedY;
+                    
+                    powerUp.style.left = `${x}px`;
+                    powerUp.style.top = `${y}px`;
+                    
+                    // Check if power-up is out of bounds
+                    if (x < -30 || x > containerWidth + 30 || 
+                        y < -30 || y > containerHeight + 30) {
+                        powerUps = powerUps.filter(p => p !== powerUp);
+                        gameContainer.removeChild(powerUp);
+                        return;
+                    }
+                    
+                    // Check collision with ship using getBoundingClientRect
+                    const shipRect = ship.getBoundingClientRect();
+                    const powerUpRect = powerUp.getBoundingClientRect();
+                    
+                    if (!(shipRect.right < powerUpRect.left || 
+                        shipRect.left > powerUpRect.right || 
+                        shipRect.bottom < powerUpRect.top || 
+                        shipRect.top > powerUpRect.bottom)) {
+                        collectPowerUp(powerUp);
                         powerUps = powerUps.filter(p => p !== powerUp);
                         gameContainer.removeChild(powerUp);
                     }
+                });
+            }
+
+            function updateHeatMeter() {
+                if (!isOverheated && heatLevel > 0) {
+                    heatLevel = Math.max(0, heatLevel - coolingRate);
+                }
+                
+                const heatPercentage = (heatLevel / maxHeatLevel) * 100;
+                rechargeBarFill.style.width = `${heatPercentage}%`;
+                
+                // Change color based on heat level
+                if (isOverheated) {
+                    rechargeBarFill.style.backgroundColor = '#ff0000';
+                } else if (heatPercentage > 75) {
+                    rechargeBarFill.style.backgroundColor = '#ff6600';
+                } else if (heatPercentage > 50) {
+                    rechargeBarFill.style.backgroundColor = '#ffcc00';
+                } else {
+                    rechargeBarFill.style.backgroundColor = '#00ff00';
+                }
+            }
+
+            function startOverheatCooldown() {
+                isOverheated = true;
+                let cooldownRemaining = overheatCooldownTime / 1000;
+                
+                if (cooldownInterval) clearInterval(cooldownInterval);
+                
+                cooldownInterval = setInterval(() => {
+                    cooldownRemaining--;
+                    cooldownText.textContent = `Cooling: ${cooldownRemaining}s`;
+                    
+                    if (cooldownRemaining <= 0) {
+                        clearInterval(cooldownInterval);
+                        cooldownText.textContent = '';
+                        isOverheated = false;
+                        canShoot = true;
+                        heatLevel = 0;
+                    }
+                }, 1000);
+            }
+
+            function collectPowerUp(powerUp) {
+                switch (powerUp.type) {
+                    case 'unlimited-fire':
+                        activateUnlimitedFire();
+                        break;
+                    case 'shield':
+                        activateShield();
+                        break;
+                    case 'triple-shot':
+                        activateTripleShot();
+                        break;
+                }
+            }
+
+            function activateUnlimitedFire() {
+                // Clear existing timeout if any
+                if (activeEffects.unlimitedFire) {
+                    clearTimeout(activeEffects.unlimitedFireTimer);
+                } else {
+                    // Only set these if it wasn't already active
+                    activeEffects.unlimitedFire = true;
+                    weaponType = 'unlimited';
+                    heatPerShot = 0; // No heat generation while power-up is active
+                    rechargeTime = 200;
+                }
+                
+                updateStatusText('UNLIMITED FIRE', 5000);
+
+                activeEffects.unlimitedFireTimer = setTimeout(() => {
+                    activeEffects.unlimitedFire = false;
+                    weaponType = 'normal';
+                    rechargeTime = 1000;
+                    heatPerShot = 10; // Restore heat generation
+                }, 5000);
+            }
+
+            function activateShield() {
+                // Clear existing timeout if any
+                if (activeEffects.shield) {
+                    clearTimeout(activeEffects.shieldTimer);
+                } else {
+                    // Only create shield if it wasn't already active
+                    activeEffects.shield = true;
+                    if (!shieldElement) {
+                        shieldElement = document.createElement('div');
+                        shieldElement.classList.add('shield');
+                        shieldElement.style.transform = 'translate(-15px, -12.5px)';
+                        ship.appendChild(shieldElement);
+                    }
+                }
+                
+                updateStatusText('SHIELD', 7000);
+
+                activeEffects.shieldTimer = setTimeout(() => {
+                    activeEffects.shield = false;
+                    if (shieldElement && shieldElement.parentNode === ship) {
+                        ship.removeChild(shieldElement);
+                    }
+                    shieldElement = null;
                 }, 7000);
             }
-        }
 
-        function updatePowerUps() {
-            powerUps.forEach((powerUp, index) => {
-                let x = parseFloat(powerUp.style.left);
-                let y = parseFloat(powerUp.style.top);
+            function activateTripleShot() {
+                // Clear existing timeout if any
+                if (activeEffects.tripleShot) {
+                    clearTimeout(activeEffects.tripleShotTimer);
+                } else {
+                    // Only set these if it wasn't already active
+                    activeEffects.tripleShot = true;
+                    weaponType = 'spread';
+                }
                 
-                x += powerUp.speedX;
-                y += powerUp.speedY;
+                updateStatusText('TRIPLE SHOT', 6000);
+
+                activeEffects.tripleShotTimer = setTimeout(() => {
+                    activeEffects.tripleShot = false;
+                    weaponType = 'normal';
+                }, 6000);
+            }
+
+            function updateStatusText(type, duration) {
+                // Check for existing status text of the same type
+                const existingStatus = document.querySelector(`.power-up-status[data-type="${type}"]`);
                 
-                powerUp.style.left = `${x}px`;
-                powerUp.style.top = `${y}px`;
-                
-                // Check if power-up is out of bounds
-                if (x < -30 || x > containerWidth + 30 || 
-                    y < -30 || y > containerHeight + 30) {
-                    powerUps = powerUps.filter(p => p !== powerUp);
-                    gameContainer.removeChild(powerUp);
+                if (existingStatus) {
+                    // If same type exists, just reset its timer
+                    clearTimeout(existingStatus.dataset.timerId);
+                    existingStatus.dataset.timerId = setTimeout(() => {
+                        if (existingStatus.parentNode === gameContainer) {
+                            gameContainer.removeChild(existingStatus);
+                            // Reposition remaining status texts
+                            const remainingTexts = document.querySelectorAll('.power-up-status');
+                            remainingTexts.forEach((text, index) => {
+                                text.style.bottom = `${60 + (index * 30)}px`;
+                            });
+                        }
+                    }, duration).toString();
                     return;
                 }
+
+                // Create new status text element if type doesn't exist
+                const statusText = document.createElement('div');
+                statusText.classList.add('power-up-status');
+                statusText.textContent = type.toUpperCase() + ' ACTIVE';
+                statusText.dataset.type = type;
                 
-                // Check collision with ship using getBoundingClientRect
-                const shipRect = ship.getBoundingClientRect();
-                const powerUpRect = powerUp.getBoundingClientRect();
+                // Find existing status texts for positioning
+                const existingStatusTexts = document.querySelectorAll('.power-up-status');
+                const offset = existingStatusTexts.length * 30;
                 
-                if (!(shipRect.right < powerUpRect.left || 
-                    shipRect.left > powerUpRect.right || 
-                    shipRect.bottom < powerUpRect.top || 
-                    shipRect.top > powerUpRect.bottom)) {
-                    collectPowerUp(powerUp);
-                    powerUps = powerUps.filter(p => p !== powerUp);
-                    gameContainer.removeChild(powerUp);
-                }
-            });
-        }
-
-        function updateHeatMeter() {
-            if (!isOverheated && heatLevel > 0) {
-                heatLevel = Math.max(0, heatLevel - coolingRate);
-            }
-            
-            const heatPercentage = (heatLevel / maxHeatLevel) * 100;
-            rechargeBarFill.style.width = `${heatPercentage}%`;
-            
-            // Change color based on heat level
-            if (isOverheated) {
-                rechargeBarFill.style.backgroundColor = '#ff0000';
-            } else if (heatPercentage > 75) {
-                rechargeBarFill.style.backgroundColor = '#ff6600';
-            } else if (heatPercentage > 50) {
-                rechargeBarFill.style.backgroundColor = '#ffcc00';
-            } else {
-                rechargeBarFill.style.backgroundColor = '#00ff00';
-            }
-        }
-
-        function startOverheatCooldown() {
-            isOverheated = true;
-            let cooldownRemaining = overheatCooldownTime / 1000;
-            
-            if (cooldownInterval) clearInterval(cooldownInterval);
-            
-            cooldownInterval = setInterval(() => {
-                cooldownRemaining--;
-                cooldownText.textContent = `Cooling: ${cooldownRemaining}s`;
+                statusText.style.bottom = `${60 + offset}px`;
+                gameContainer.appendChild(statusText);
                 
-                if (cooldownRemaining <= 0) {
-                    clearInterval(cooldownInterval);
-                    cooldownText.textContent = '';
-                    isOverheated = false;
-                    canShoot = true;
-                    heatLevel = 0;
-                }
-            }, 1000);
-        }
-
-        function collectPowerUp(powerUp) {
-            switch (powerUp.type) {
-                case 'unlimited-fire':
-                    activateUnlimitedFire();
-                    break;
-                case 'shield':
-                    activateShield();
-                    break;
-                case 'triple-shot':
-                    activateTripleShot();
-                    break;
-            }
-        }
-
-        function activateUnlimitedFire() {
-            // Clear existing timeout if any
-            if (activeEffects.unlimitedFire) {
-                clearTimeout(activeEffects.unlimitedFireTimer);
-            } else {
-                // Only set these if it wasn't already active
-                activeEffects.unlimitedFire = true;
-                weaponType = 'unlimited';
-                heatPerShot = 0; // No heat generation while power-up is active
-                rechargeTime = 200;
-            }
-            
-            updateStatusText('UNLIMITED FIRE', 5000);
-
-            activeEffects.unlimitedFireTimer = setTimeout(() => {
-                activeEffects.unlimitedFire = false;
-                weaponType = 'normal';
-                rechargeTime = 1000;
-                heatPerShot = 10; // Restore heat generation
-            }, 5000);
-        }
-
-        function activateShield() {
-            // Clear existing timeout if any
-            if (activeEffects.shield) {
-                clearTimeout(activeEffects.shieldTimer);
-            } else {
-                // Only create shield if it wasn't already active
-                activeEffects.shield = true;
-                if (!shieldElement) {
-                    shieldElement = document.createElement('div');
-                    shieldElement.classList.add('shield');
-                    shieldElement.style.transform = 'translate(-15px, -12.5px)';
-                    ship.appendChild(shieldElement);
-                }
-            }
-            
-            updateStatusText('SHIELD', 7000);
-
-            activeEffects.shieldTimer = setTimeout(() => {
-                activeEffects.shield = false;
-                if (shieldElement && shieldElement.parentNode === ship) {
-                    ship.removeChild(shieldElement);
-                }
-                shieldElement = null;
-            }, 7000);
-        }
-
-        function activateTripleShot() {
-            // Clear existing timeout if any
-            if (activeEffects.tripleShot) {
-                clearTimeout(activeEffects.tripleShotTimer);
-            } else {
-                // Only set these if it wasn't already active
-                activeEffects.tripleShot = true;
-                weaponType = 'spread';
-            }
-            
-            updateStatusText('TRIPLE SHOT', 6000);
-
-            activeEffects.tripleShotTimer = setTimeout(() => {
-                activeEffects.tripleShot = false;
-                weaponType = 'normal';
-            }, 6000);
-        }
-
-        function updateStatusText(type, duration) {
-            // Check for existing status text of the same type
-            const existingStatus = document.querySelector(`.power-up-status[data-type="${type}"]`);
-            
-            if (existingStatus) {
-                // If same type exists, just reset its timer
-                clearTimeout(existingStatus.dataset.timerId);
-                existingStatus.dataset.timerId = setTimeout(() => {
-                    if (existingStatus.parentNode === gameContainer) {
-                        gameContainer.removeChild(existingStatus);
+                // Store timer ID for potential reset
+                statusText.dataset.timerId = setTimeout(() => {
+                    if (statusText.parentNode === gameContainer) {
+                        gameContainer.removeChild(statusText);
                         // Reposition remaining status texts
                         const remainingTexts = document.querySelectorAll('.power-up-status');
                         remainingTexts.forEach((text, index) => {
@@ -1369,153 +1469,160 @@
                         });
                     }
                 }, duration).toString();
-                return;
             }
 
-            // Create new status text element if type doesn't exist
-            const statusText = document.createElement('div');
-            statusText.classList.add('power-up-status');
-            statusText.textContent = type.toUpperCase() + ' ACTIVE';
-            statusText.dataset.type = type;
-            
-            // Find existing status texts for positioning
-            const existingStatusTexts = document.querySelectorAll('.power-up-status');
-            const offset = existingStatusTexts.length * 30;
-            
-            statusText.style.bottom = `${60 + offset}px`;
-            gameContainer.appendChild(statusText);
-            
-            // Store timer ID for potential reset
-            statusText.dataset.timerId = setTimeout(() => {
-                if (statusText.parentNode === gameContainer) {
-                    gameContainer.removeChild(statusText);
-                    // Reposition remaining status texts
-                    const remainingTexts = document.querySelectorAll('.power-up-status');
-                    remainingTexts.forEach((text, index) => {
-                        text.style.bottom = `${60 + (index * 30)}px`;
-                    });
-                }
-            }, duration).toString();
-        }
+            function spawnRandomPowerUp() {
+                const types = ['unlimited-fire', 'shield', 'triple-shot'];
+                const randomType = types[Math.floor(Math.random() * types.length)];
+                createPowerUp(randomType);
+            }
 
-        function spawnRandomPowerUp() {
-            const types = ['unlimited-fire', 'shield', 'triple-shot'];
-            const randomType = types[Math.floor(Math.random() * types.length)];
-            createPowerUp(randomType);
-        }
+            function showUpgradeScreen() {
+                const upgradeScreen = document.createElement('div');
+                upgradeScreen.classList.add('upgrade-screen');
+                upgradeScreen.innerHTML = `
+                    <div class="upgrade-container">
+                        <h2>Upgrades</h2>
+                        <p>Total Score: ${permanentStats.totalScore}</p>
+                        <div class="upgrade-list" style="max-height: 400px; overflow-y: auto;"></div>
+                        <button class="restart-button">Start New Game</button>
+                        <button class="clear-save-button">Clear Save & Start Fresh</button>
+                    </div>
+                `;
 
-        function showUpgradeScreen() {
-            const upgradeScreen = document.createElement('div');
-            upgradeScreen.classList.add('upgrade-screen');
-            upgradeScreen.innerHTML = `
-                <div class="upgrade-container">
-                    <h2>Upgrades</h2>
-                    <p>Total Score: ${permanentStats.totalScore}</p>
-                    <div class="upgrade-list"></div>
-                    <button class="restart-button">Start New Game</button>
-                    <button class="clear-save-button">Clear Save & Start Fresh</button>
-                </div>
-            `;
+                const upgradeList = upgradeScreen.querySelector('.upgrade-list');
+                
+                // Add all upgrade types to the screen
+                Object.entries(upgradeTypes).forEach(([type, data]) => {
+                    const currentLevel = permanentStats.upgradeLevels[type] || 0;
+                    if (currentLevel < 5) {  // Only show if not max level
+                        const upgrade = data.levels[currentLevel];
+                        const item = document.createElement('div');
+                        item.classList.add('upgrade-item');
+                        
+                        // Create description based on upgrade type
+                        let description = '';
+                        if (upgrade.multiplier) description = `${(upgrade.multiplier * 100 - 100).toFixed(0)}% increase`;
+                        else if (upgrade.width) description = `${upgrade.width}px width`;
+                        else if (upgrade.lives) description = `+${upgrade.lives} lives`;
+                        else if (upgrade.cooldown) description = `${((1000 - upgrade.cooldown) / 10).toFixed(0)}% faster`;
+                        else if (upgrade.reduction) description = `${(upgrade.reduction * 100).toFixed(0)}% less heat`;
+                        else if (upgrade.hits) description = `${upgrade.hits} hits`;
+                        else if (upgrade.chance) description = `${(upgrade.chance * 100).toFixed(0)}% more frequent`;
 
-            const upgradeList = upgradeScreen.querySelector('.upgrade-list');
-            
-            Object.entries(upgradeTypes).forEach(([type, data]) => {
-                const currentLevel = permanentStats.upgradeLevels[type];
-                if (currentLevel < 5) {
-                    const upgrade = data.levels[currentLevel];
-                    const item = document.createElement('div');
-                    item.classList.add('upgrade-item');
-                    item.innerHTML = `
-                        <span>${data.name} (Level ${currentLevel}/5)</span>
-                        <button class="upgrade-button" ${permanentStats.totalScore >= upgrade.cost ? '' : 'disabled'}>
-                            Upgrade (${upgrade.cost} points)
-                        </button>
-                    `;
-                    const button = item.querySelector('.upgrade-button');
-                    button.addEventListener('click', () => {
-                        if (permanentStats.totalScore >= upgrade.cost) {
-                            permanentStats.totalScore -= upgrade.cost;
-                            permanentStats.upgradeLevels[type]++;
-                            localStorage.setItem('permanentStats', JSON.stringify(permanentStats));
-                            document.body.removeChild(upgradeScreen);
-                            showUpgradeScreen();
-                        }
-                    });
-                    upgradeList.appendChild(item);
-                }
-            });
+                        item.innerHTML = `
+                            <div style="flex: 1;">
+                                <div>${data.name} (Level ${currentLevel}/5)</div>
+                                <div style="font-size: 0.8em; color: #aaa;">${description}</div>
+                            </div>
+                            <button class="upgrade-button" ${permanentStats.totalScore >= upgrade.cost ? '' : 'disabled'}>
+                                Upgrade (${upgrade.cost} points)
+                            </button>
+                        `;
 
-            const restartButton = upgradeScreen.querySelector('.restart-button');
-            restartButton.addEventListener('click', () => {
-                document.body.removeChild(upgradeScreen);
-                resetGame();
-            });
-
-            const clearSaveButton = upgradeScreen.querySelector('.clear-save-button');
-            clearSaveButton.addEventListener('click', () => {
-                localStorage.clear();
-                permanentStats = {
-                    totalScore: 0,
-                    upgradeLevels: {
-                        LASER_SPEED: 0,
-                        LASER_WIDTH: 0,
-                        POWERUP_DURATION: 0,
-                        SHIP_SPEED: 0,
-                        EXTRA_LIVES: 0
+                        const button = item.querySelector('.upgrade-button');
+                        button.addEventListener('click', () => {
+                            if (permanentStats.totalScore >= upgrade.cost) {
+                                permanentStats.totalScore -= upgrade.cost;
+                                permanentStats.upgradeLevels[type] = (permanentStats.upgradeLevels[type] || 0) + 1;
+                                localStorage.setItem('permanentStats', JSON.stringify(permanentStats));
+                                document.body.removeChild(upgradeScreen);
+                                showUpgradeScreen();
+                            }
+                        });
+                        upgradeList.appendChild(item);
                     }
-                };
-                document.body.removeChild(upgradeScreen);
-                resetGame();
-            });
+                });
 
-            document.body.appendChild(upgradeScreen);
-        }
+                const restartButton = upgradeScreen.querySelector('.restart-button');
+                restartButton.addEventListener('click', () => {
+                    document.body.removeChild(upgradeScreen);
+                    resetGame();
+                });
 
-        // Only save permanentStats now, no per-run variables
-        function saveGameState() {
-            const gameState = { permanentStats };
-            localStorage.setItem('gameState', JSON.stringify(gameState));
-        }
+                const clearSaveButton = upgradeScreen.querySelector('.clear-save-button');
+                clearSaveButton.addEventListener('click', () => {
+                    localStorage.clear();
+                    permanentStats = {
+                        totalScore: 0,
+                        upgradeLevels: {
+                            LASER_SPEED: 0,
+                            LASER_WIDTH: 0,
+                            POWERUP_DURATION: 0,
+                            SHIP_SPEED: 0,
+                            EXTRA_LIVES: 0,
+                            RAPID_FIRE: 0,
+                            HEAT_RESISTANCE: 0,
+                            SCORE_MULTIPLIER: 0,
+                            POWERUP_CHANCE: 0,
+                            SHIELD_STRENGTH: 0
+                        }
+                    };
+                    document.body.removeChild(upgradeScreen);
+                    resetGame();
+                });
 
-        // Load only permanentStats from saved state
-        function loadGameState() {
-            const savedState = localStorage.getItem('gameState');
-            if (savedState) {
-                const gameState = JSON.parse(savedState);
-                permanentStats = gameState.permanentStats;
-                return true;
+                document.body.appendChild(upgradeScreen);
             }
-            return false;
-        }
 
-        function resetGame() {
-            // Reset per-run variables
-            score = 0;
-            lives = 3 + (permanentStats.upgradeLevels.EXTRA_LIVES > 0 
-                ? upgradeTypes.EXTRA_LIVES.levels[permanentStats.upgradeLevels.EXTRA_LIVES - 1].lives 
-                : 0);
-            isGameOver = false;
-            shipX = containerWidth / 2;
-            shipY = containerHeight - 50;
-            shipSpeedX = 0;
-            shipSpeedY = 0;
-            scoreDisplay.textContent = '0';
-            livesDisplay.textContent = lives.toString();
+            // Only save permanentStats now, no per-run variables
+            function saveGameState() {
+                const gameState = { permanentStats };
+                localStorage.setItem('gameState', JSON.stringify(gameState));
+            }
 
-            // Clear enemies, lasers, etc.
-            asteroids.forEach(a => gameContainer.removeChild(a));
-            asteroids = [];
-            lasers.forEach(l => gameContainer.removeChild(l));
-            lasers = [];
-            powerUps.forEach(p => gameContainer.removeChild(p));
-            powerUps = [];
+            // Load only permanentStats from saved state
+            function loadGameState() {
+                const savedState = localStorage.getItem('gameState');
+                if (savedState) {
+                    const gameState = JSON.parse(savedState);
+                    permanentStats = gameState.permanentStats;
+                    return true;
+                }
+                return false;
+            }
 
-            resetShipPosition();
-            startGameLoop();
-        }
+            function resetGame() {
+                // Reset per-run variables
+                score = 0;
+                lives = 3 + (permanentStats.upgradeLevels.EXTRA_LIVES > 0 
+                    ? upgradeTypes.EXTRA_LIVES.levels[permanentStats.upgradeLevels.EXTRA_LIVES - 1].lives 
+                    : 0);
+                isGameOver = false;
+                shipX = containerWidth / 2;
+                shipY = containerHeight - 50;
+                shipSpeedX = 0;
+                shipSpeedY = 0;
+                scoreDisplay.textContent = '0';
+                livesDisplay.textContent = lives.toString();
 
-        initializeStars();
-        startGameLoop();
+                // Clear enemies, lasers, etc.
+                asteroids.forEach(a => gameContainer.removeChild(a));
+                asteroids = [];
+                lasers.forEach(l => gameContainer.removeChild(l));
+                lasers = [];
+                powerUps.forEach(p => gameContainer.removeChild(p));
+                powerUps = [];
+
+                resetShipPosition();
+                startGameLoop();
+                setInterval(() => {
+                    if (!isGameOver) {
+                        createAsteroid();
+                    }
+                }, asteroidSpawnInterval);
+
+                setInterval(() => {
+                    if (!isGameOver) {
+                        spawnPowerUp(Math.random() * containerWidth, Math.random() * containerHeight, false);
+                    }
+                }, 5000);
+            }
+
+            initializeStars();
+            loadGameState();
+            resetGame();
+        });
     </script>
 </body>
 </html>
