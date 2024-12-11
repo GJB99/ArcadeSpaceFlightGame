@@ -684,28 +684,27 @@
                 ship.style.top = `${shipY}px`;
             }
 
-            // Update keyboard event handling
-            let keysPressed = new Set(); // Using Set instead of object for better key tracking
+            let keysPressed = {};
+            let isShootingEnabled = false;
 
             window.addEventListener('keydown', (event) => {
-                // Prevent default behavior
                 if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(event.key)) {
                     event.preventDefault();
                 }
-                keysPressed.add(event.key);
+                keysPressed[event.key] = true;
+
+                // Set shooting flag when space is pressed
+                if (event.key === ' ') {
+                    isShootingEnabled = true;
+                }
             });
 
             window.addEventListener('keyup', (event) => {
-                keysPressed.delete(event.key);
-            });
-
-            // Add a separate event just for Space to ensure shooting always works
-            window.addEventListener('keypress', (event) => {
+                delete keysPressed[event.key];
+                
+                // Clear shooting flag when space is released
                 if (event.key === ' ') {
-                    event.preventDefault();
-                    if (canShoot && !isOverheated) {
-                        createLaser();
-                    }
+                    isShootingEnabled = false;
                 }
             });
 
@@ -713,8 +712,8 @@
             function gameLoop() {
                 if (isGameOver) return;
 
-                // Handle shooting in both keypress and gameLoop for redundancy
-                if (keysPressed.has(' ') && canShoot && !isOverheated) {
+                // Handle shooting using the flag instead of direct key check
+                if (isShootingEnabled && canShoot && !isOverheated) {
                     createLaser();
                 }
 
@@ -722,18 +721,18 @@
                 let dx = 0;
                 let dy = 0;
 
-                if (keysPressed.has('ArrowLeft')) dx -= 1;
-                if (keysPressed.has('ArrowRight')) dx += 1;
-                if (keysPressed.has('ArrowUp')) dy -= 1;
-                if (keysPressed.has('ArrowDown')) dy += 1;
+                if (keysPressed['ArrowLeft']) dx -= 1;
+                if (keysPressed['ArrowRight']) dx += 1;
+                if (keysPressed['ArrowUp']) dy -= 1;
+                if (keysPressed['ArrowDown']) dy += 1;
 
                 // Update ship speed
                 shipSpeedX += dx * shipAcceleration;
                 shipSpeedY += dy * shipAcceleration;
 
                 // Apply deceleration
-                shipSpeedX *= (1 - shipDeceleration);
-                shipSpeedY *= (1 - shipDeceleration);
+                if (dx === 0) shipSpeedX *= (1 - shipDeceleration);
+                if (dy === 0) shipSpeedY *= (1 - shipDeceleration);
 
                 // Limit speed
                 shipSpeedX = Math.max(-maxShipSpeed, Math.min(maxShipSpeed, shipSpeedX));
@@ -750,7 +749,7 @@
                 ship.style.left = `${shipX}px`;
                 ship.style.top = `${shipY}px`;
 
-                // Rest of gameLoop remains the same
+                // Rest of your existing gameLoop code stays the same...
                 updateLasers();
                 updateAsteroids();
                 checkCollisions();
