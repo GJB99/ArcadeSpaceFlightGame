@@ -16,12 +16,21 @@
             font-family: monospace;
         }
 
+        .game-wrapper {
+            width: 800px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
         #game-container {
-            position: relative;
             width: 800px;
             height: 600px;
-            background-color: #000;
-            border: 2px solid #fff;
+            background: black;
+            border: 1px solid white;
+            overflow: hidden;
+            position: relative;
         }
 
         .star {
@@ -325,26 +334,67 @@
         .best-time-display {
             bottom: 20px;
         }
+
+        .controls-grid {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            padding: 20px 0;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .key {
+            background-color: #333;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .action {
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
-    <div id="game-container">
-        <div class="score-display">Score: <span id="score">0</span></div>
-        <div class="lives-display">Lives: <span id="lives">3</span></div>
-        <div class="recharge-bar-container">
-            <div class="recharge-bar">
-                <div class="recharge-bar-fill" id="recharge-bar-fill"></div>
+    <div class="game-wrapper">
+        <div id="game-container">
+            <div class="score-display">Score: <span id="score">0</span></div>
+            <div class="lives-display">Lives: <span id="lives">3</span></div>
+            <div class="recharge-bar-container">
+                <div class="recharge-bar">
+                    <div class="recharge-bar-fill" id="recharge-bar-fill"></div>
+                </div>
+                <div class="cooldown-text" id="cooldown-text"></div>
             </div>
-            <div class="cooldown-text" id="cooldown-text"></div>
+            <div class="game-over-screen" id="game-over">
+                <p>Game Over</p>
+                <p>Final Score: <span id="final-score">0</span></p>
+                <button onclick="restartGame()">Restart</button>
+            </div>
+            <div class="multiplier-display">Multiplier: <span id="multiplier">1x</span></div>
+            <div class="timer-display">Time: <span id="timer">0:00</span></div>
+            <div class="best-time-display">Best Time: <span id="best-timer">0:00</span></div>
         </div>
-        <div class="game-over-screen" id="game-over">
-            <p>Game Over</p>
-            <p>Final Score: <span id="final-score">0</span></p>
-            <button onclick="restartGame()">Restart</button>
+
+        <div class="controls-grid">
+            <div class="control-item">
+                <span class="key">↑↓←→</span>
+                <span class="action">Move Ship</span>
+            </div>
+            <div class="control-item">
+                <span class="key">SPACE</span>
+                <span class="action">Shoot</span>
+            </div>
         </div>
-        <div class="multiplier-display">Multiplier: <span id="multiplier">1x</span></div>
-        <div class="timer-display">Time: <span id="timer">0:00</span></div>
-        <div class="best-time-display">Best Time: <span id="best-timer">0:00</span></div>
     </div>
 
     <script>
